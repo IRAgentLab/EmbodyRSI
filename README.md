@@ -18,6 +18,7 @@ docs/
   AMBench迭代记录.md          70 条迭代：输入、判断、对错、改动、效果
   仿真修复清单.md             查实的 AM-Bench 环境缺陷与修法
   AMBench实验现状.md          成绩表与进行中的实验
+  RoboTwin基线复测.md         RoboTwin 2.0 上 π₀.₅ 官方基线与复测清单
   HPC使用要点.md              集群使用规则与常用作业
   html/                      研究规划与成绩页的网页版
   surveys/                   文献与基准调研
