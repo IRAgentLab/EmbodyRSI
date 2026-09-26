@@ -1,0 +1,1333 @@
+diff --git a/scripts/data/export_lerobot_to_openpi.py b/scripts/data/export_lerobot_to_openpi.py
+index 59bf602..fa48523 100644
+--- a/scripts/data/export_lerobot_to_openpi.py
++++ b/scripts/data/export_lerobot_to_openpi.py
+@@ -42,6 +42,7 @@ STATE_KEY_DIMS = {
+     "arm_joint_pos": 4,
+     "base_pos": 3,
+     "base_quat": 4,
++    "ee_wrench": 6,  # wrist F/T (ee_link joint reaction wrench, body frame); exported only with --include_wrench
+ }
+ 
+ 
+@@ -195,6 +196,7 @@ def openpi_frame(
+     ee_image_key: str,
+     base_image_key: str,
+     include_base_image: bool,
++    include_wrench: bool = False,
+     task_prompt: str,
+     task_prompt_map: dict[str, str],
+     require_task_prompt_map: bool,
+@@ -229,6 +231,8 @@ def openpi_frame(
+                 f"Got action shape {action.shape} and state keys {list(state_parts)}."
+             )
+         frame.update({key: state_parts[key].astype(np.float32, copy=False) for key in required})
++        if include_wrench and "ee_wrench" in state_parts:
++            frame["ee_wrench"] = state_parts["ee_wrench"].astype(np.float32, copy=False)
+     elif action_semantics == BASE_JOINT_ABSOLUTE:
+         required = {"base_pos", "base_quat", "arm_joint_pos", "gripper_width"}
+         if action.size != 12 or not required.issubset(state_parts):
+@@ -452,6 +456,7 @@ def parse_args() -> argparse.Namespace:
+         help="Output dataset root. Defaults to $HF_LEROBOT_HOME/<repo_id>.",
+     )
+     parser.add_argument("--target_hz", type=int, default=20, help="Logical policy FPS for the OpenPI export.")
++    parser.add_argument("--include_wrench", action="store_true", help="Also export the recorded wrist wrench (ee_wrench, 6D) as a frame feature.")
+     parser.add_argument("--ee_image_key", default=DEFAULT_EE_IMAGE_KEY, help="Canonical EE camera feature key.")
+     parser.add_argument("--base_image_key", default=DEFAULT_BASE_IMAGE_KEY, help="Canonical base camera feature key.")
+     parser.add_argument(
+@@ -534,6 +539,7 @@ def main() -> None:
+                     ee_image_key=args.ee_image_key,
+                     base_image_key=args.base_image_key,
+                     include_base_image=not args.omit_base_image,
++                    include_wrench=args.include_wrench,
+                     task_prompt=args.task_prompt,
+                     task_prompt_map=prompt_map,
+                     require_task_prompt_map=args.require_task_prompt_map,
+diff --git a/scripts/data/record_demos_scripted.py b/scripts/data/record_demos_scripted.py
+index d47c99b..5d084fa 100644
+--- a/scripts/data/record_demos_scripted.py
++++ b/scripts/data/record_demos_scripted.py
+@@ -26,6 +26,7 @@ optional arguments:
+ 
+ import argparse
+ import contextlib
++import os
+ import importlib
+ from pathlib import Path
+ 
+@@ -62,6 +63,21 @@ parser.add_argument(
+     help="Length of each episode in seconds.",
+ )
+ parser.add_argument("--video", action="store_true", default=False, help="Record video of the agent.")
++parser.add_argument(
++    "--max_attempts",
++    type=int,
++    default=0,
++    help="Stop after this many attempted episodes (success or failure). 0 = unlimited. "
++         "Debug aid for tasks whose success rate is ~0: lets the loop exit normally so the "
++         "dataset is finalised instead of being truncated by an external kill.",
++)
++parser.add_argument(
++    "--lerobot_use_videos",
++    action="store_true",
++    default=False,
++    help="Write LeRobot image columns as encoded video instead of per-frame JPEG "
++         "embedded in parquet. Much smaller on disk and faster to record.",
++)
+ parser.add_argument(
+     "--save_failed_episodes",
+     action="store_true",
+@@ -250,14 +266,25 @@ def process_success_condition(
+     Returns:
+         `True` if the recorder and policy state should be reset, otherwise `False`.
+     """
+-    _, _, terminated, truncated, _ = obv
++    _, _, terminated, truncated, extras = obv
++
++    def _criteria_str() -> str:
++        """Per-subtask criteria for this env, e.g. 'ball_released=1 ball_delivered=0'."""
++        try:
++            crit = (extras or {}).get("success_criteria") or {}
++            if not crit:
++                return ""
++            return "  " + " ".join(f"{k}={int(bool(v[env_id]))}" for k, v in crit.items())
++        except Exception:
++            return ""
++
+     if terminated[env_id]:
+-        print(f"✔️ [Env {env_id}] Episode terminated (success)")
++        print(f"✔️ [Env {env_id}] Episode terminated (success){_criteria_str()}")
+         recorder.finish_episode(env_id, success=True)
+         return True
+ 
+     if truncated[env_id]:
+-        print(f"❌ [Env {env_id}] Episode truncated (timeout without success)")
++        print(f"❌ [Env {env_id}] Episode truncated (timeout without success){_criteria_str()}")
+         recorder.finish_episode(env_id, success=False)
+         return True
+ 
+@@ -326,7 +353,11 @@ def run_simulation_loop(
+     action_adapter = BaseJointActionAdapter(env_unwrapped)
+     with contextlib.suppress(KeyboardInterrupt) and torch.inference_mode():
+         loop_step_count = 0
++        attempts_done = 0
+         while simulation_app.is_running():
++            if args_cli.max_attempts and attempts_done >= args_cli.max_attempts:
++                print(f"[INFO]: reached --max_attempts={args_cli.max_attempts}, stopping cleanly.", flush=True)
++                break
+             loop_step_count += 1
+             if loop_step_count == 1 or loop_step_count % 600 == 0:
+                 print(f"[INFO]: Scripted recorder loop step {loop_step_count}", flush=True)
+@@ -348,6 +379,7 @@ def run_simulation_loop(
+             for env_id in range(num_envs):
+                 reset_needed = process_success_condition(recorder, obv, env_id)
+                 if reset_needed:
++                    attempts_done += 1
+                     envs_to_reset.append(env_id)
+ 
+             # Reset recorder and policy state for environments that finished.
+@@ -396,6 +428,19 @@ def main() -> None:
+         return
+ 
+     # Set up the rate limiter.
++        # AMBENCH_DEBUG_TRAJ=1 打开脚本专家的逐 waypoint 坐标输出（默认是 logger.debug，看不到）
++    if os.environ.get("AMBENCH_DEBUG_TRAJ") == "1":
++        import logging as _logging
++
++        _lg = _logging.getLogger("ambench.policies.scripted.base")
++        _lg.setLevel(_logging.DEBUG)
++        if not _lg.handlers:
++            _h = _logging.StreamHandler()
++            _h.setFormatter(_logging.Formatter("[TRAJ] %(message)s"))
++            _lg.addHandler(_h)
++        _lg.propagate = False
++        print("[INFO]: AMBENCH_DEBUG_TRAJ=1 -> 输出脚本专家 waypoint 明细")
++
+     rate_limiter = RateLimiter(args_cli.step_hz)
+ 
+     # Create the output directory for the recording session.
+@@ -442,6 +487,7 @@ def main() -> None:
+         repo_id=args_cli.repo_id or None,
+         state_keys=args_cli.state_keys,
+         task_prompt=args_cli.task_prompt or None,
++        lerobot_use_videos=args_cli.lerobot_use_videos,
+         save_failed_episodes=args_cli.save_failed_episodes,
+     )
+     print(f"Created dataset recorder for {env.num_envs} parallel environments")
+diff --git a/source/ambench/ambench/policies/scripted/frame_assembly.py b/source/ambench/ambench/policies/scripted/frame_assembly.py
+index e463d48..8d5c032 100644
+--- a/source/ambench/ambench/policies/scripted/frame_assembly.py
++++ b/source/ambench/ambench/policies/scripted/frame_assembly.py
+@@ -4,6 +4,8 @@
+ 
+ """Scripted policy for frame assembly task."""
+ 
++import os
++import torch
+ import isaaclab.utils.math as math_utils
+ 
+ from .base import BasePolicy, Waypoint
+@@ -127,3 +129,48 @@ class FrameAssemblyPolicy(BasePolicy):
+         ]
+ 
+         self._log_trajectory_summary()
++
++    # ---- 闭环补偿：框架在爪里会下滑/摆动，到墙前按实测偏移重算插入路点 ----
++    REPLAN_T = 2750          # approach_wall 的停顿点（见上面的路点表）
++    REPLAN_END = 3200        # 松爪为止每步刷新
++    FRAME_INSERT_X = -0.06   # 原路点隐含的目标：插入结束时框架中心在 peg_center.x − 0.06
++
++    def _replan_insert(self, obs, env_id: int) -> None:
++        obs_dict = obs["policy"][env_id]
++        ee_pos = obs_dict["ee_pos"].clone()
++        frame_pos = obs_dict["frame_pos"].clone()
++        peg_center = obs_dict["peg_center_pos"].clone()
++        off = frame_pos - ee_pos                       # 实测 frame − ee
++        identity_quat = self.identity_quat()
++        insert_pos = peg_center - off
++        insert_pos[0] += self.FRAME_INSERT_X
++        if self.step_count == self.REPLAN_T or not hasattr(self, "_hold_pos"):
++            self._hold_pos = ee_pos.clone()
++        hold_pos = self._hold_pos
++        retract_pos = insert_pos.clone()
++        retract_pos[0] = peg_center[0] - 0.60
++        keep = [wp for wp in self.waypoints if wp.t < self.REPLAN_T]
++        self.waypoints = keep + [
++            Waypoint(t=self.REPLAN_T, xyz=hold_pos, quat=identity_quat, gripper=-1.0),
++            Waypoint(t=3100, xyz=insert_pos, quat=identity_quat, gripper=-1.0),
++            Waypoint(t=3200, xyz=insert_pos, quat=identity_quat, gripper=1.0),
++            Waypoint(t=3400, xyz=retract_pos, quat=identity_quat, gripper=1.0),
++        ]
++        if self.step_count == self.REPLAN_T:
++          self._log_trajectory_summary(
++            f"replan@{self.REPLAN_T}: frame-ee offset x/y/z = {off[0].item():+.3f}/{off[1].item():+.3f}/{off[2].item():+.3f}"
++        )
++
++    def advance(self, obs, env_id) -> torch.Tensor:
++        if (
++            self.trajectory_generated
++            and self.REPLAN_T <= self.step_count <= self.REPLAN_END
++            and os.environ.get("AMBENCH_FRAME_REPLAN", "1") == "1"
++        ):
++            self._replan_insert(obs, env_id)
++        return super().advance(obs, env_id)
++
++    def reset(self):
++        super().reset()
++        if hasattr(self, "_hold_pos"):
++            del self._hold_pos
+diff --git a/source/ambench/ambench/policies/scripted/toss_ball.py b/source/ambench/ambench/policies/scripted/toss_ball.py
+index 0e5f0f5..01f1952 100644
+--- a/source/ambench/ambench/policies/scripted/toss_ball.py
++++ b/source/ambench/ambench/policies/scripted/toss_ball.py
+@@ -2,142 +2,127 @@
+ #
+ # SPDX-License-Identifier: Apache-2.0
+ 
+-"""Scripted policy for toss-ball task."""
++"""Scripted policy for toss-ball task (ballistic-solving version, 2026-09-25).
++
++The original expert used a fixed open-loop swing that was never validated (the ball was never actually held, see the
++grasp fixes in the env). This version solves the throw analytically:
++
++1. Align laterally with the bin (y), keep the wrist level so the held ball stays above the front rotor booms.
++2. Move to the swing start S, a run-up of ``run_up`` metres behind the release point R along the launch direction.
++3. Sweep S -> R -> F (follow-through) at constant commanded speed; the gripper opens at R, the ball leaves with the
++   wrist velocity a few steps later while the wrist is still moving along the same line.
++
++Release point: ``d0`` metres behind the bin centre (x), height ``z_rel``. Launch angle ``theta``. The required speed
++follows from projectile motion (no drag is simulated, so the ball mass does not enter):
++    v^2 = g d^2 / (2 cos^2(theta) (d tan(theta) - h)),  d = horizontal distance ball->bin, h = z_bin_rim - z_ball.
++``k`` is the measured ratio realised/commanded wrist speed (PID tracking lag); commanded speed = v / k.
++Env knobs: AMBENCH_TOSS_THETA (deg, 25), AMBENCH_TOSS_D0 (1.0), AMBENCH_TOSS_ZREL (1.45), AMBENCH_TOSS_AIMX (-0.10), AMBENCH_TOSS_K (0.87),
++AMBENCH_TOSS_RUNUP (0.8), AMBENCH_TOSS_FOLLOW (0.4).
++"""
++
++import math
++import os
+ 
+ import isaaclab.utils.math as math_utils
+ import torch
+ 
+ from .base import BasePolicy, Waypoint
+ 
++BALL_GRASP_OFFSET_X = 0.13  # ball centre ahead of the wrist (see TossBallEnvCfg.ball_grasp_offset_local)
++BIN_RIM_Z = 0.17            # container height: aim the ball at the rim plane above the bin centre
++GRAVITY = 9.81
+ 
+-class TossBallPolicy(BasePolicy):
+-    """Scripted policy for toss-ball task.
+ 
+-    The trajectory is box-aware:
+-    1. Tilt down in place to stabilize the camera/viewing direction
+-    2. Align laterally with the target box in y
+-    3. Move forward toward the target x position
+-    4. Execute a softened throwing motion with a short closed pre-throw
+-    """
++class TossBallPolicy(BasePolicy):
++    """Ballistic tossing expert."""
+ 
+     def generate_trajectory(self, obs, env_id: int = 0):
+-        """Generate a target-aware tossing trajectory."""
+         obs_dict = obs["policy"][env_id]
+         target_pos = obs_dict["target_pos"]
+         init_ee_pose = self._ee_pos_init_local[env_id]
+-
+-        def uniform_offset(
+-            x_range: tuple[float, float] = (0.0, 0.0),
+-            y_range: tuple[float, float] = (0.0, 0.0),
+-            z_range: tuple[float, float] = (0.0, 0.0),
+-        ) -> torch.Tensor:
+-            return torch.tensor(
+-                [
+-                    math_utils.sample_uniform(*x_range, size=1, device=self.device).item(),
+-                    math_utils.sample_uniform(*y_range, size=1, device=self.device).item(),
+-                    math_utils.sample_uniform(*z_range, size=1, device=self.device).item(),
+-                ],
+-                dtype=init_ee_pose.dtype,
+-                device=self.device,
+-            )
+-
+         identity_quat = self.identity_quat()
+-
+-        release_pitch_delta = math_utils.sample_uniform(lower=-0.04, upper=0.04, size=1, device=self.device).item()
+-        load_pitch_delta = math_utils.sample_uniform(lower=-0.05, upper=0.05, size=1, device=self.device).item()
+-
+-        pitch_down_move_quat = math_utils.quat_from_euler_xyz(
+-            torch.tensor([0.0], device=self.device),
+-            torch.tensor([torch.pi / 5.0], device=self.device),
+-            torch.tensor([0.0], device=self.device),
+-        )[0]
+-
+-        pitch_down_quat = math_utils.quat_from_euler_xyz(
+-            torch.tensor([0.0], device=self.device),
+-            torch.tensor([torch.pi / 3.0 + load_pitch_delta], device=self.device),
+-            torch.tensor([0.0], device=self.device),
+-        )[0]
+-
+-        pitch_down_release_quat = math_utils.quat_from_euler_xyz(
+-            torch.tensor([0.0], device=self.device),
+-            torch.tensor([0.0 + release_pitch_delta], device=self.device),
+-            torch.tensor([0.0], device=self.device),
+-        )[0]
+-
+-        # Stage 1: tilt down in place before translating.
+-        tilt_down_pose = init_ee_pose.clone()
+-        tilt_down_pose += uniform_offset(
+-            x_range=(-0.03, 0.03),
+-            y_range=(-0.03, 0.03),
+-            z_range=(-0.02, 0.02),
+-        )
+-
+-        # Stage 2: align laterally with the box while staying near the initial x position.
+-        align_y_pose = init_ee_pose.clone()
+-        align_y_pose[1] = (
+-            target_pos[1] + math_utils.sample_uniform(lower=-0.06, upper=0.06, size=1, device=self.device).item()
+-        )
+-        align_y_pose[0] += math_utils.sample_uniform(lower=-0.05, upper=0.10, size=1, device=self.device).item()
+-        align_y_pose[2] += math_utils.sample_uniform(lower=-0.03, upper=0.03, size=1, device=self.device).item()
+-
+-        # Stage 3: move forward toward the box before the throw sequence starts.
+-        forward_pose = align_y_pose.clone()
+-        forward_pose[0] = (
+-            init_ee_pose[0].item()
+-            + math_utils.sample_uniform(lower=0.25, upper=0.45, size=1, device=self.device).item()
+-        )
+-        forward_pose[2] += math_utils.sample_uniform(lower=-0.03, upper=0.04, size=1, device=self.device).item()
+-
+-        # Throwing waypoints retain the successful original geometry, but spread the release over more frames.
+-        wp_throw_load = align_y_pose.clone()
+-        wp_throw_load[0] = (
+-            forward_pose[0].item()
+-            + math_utils.sample_uniform(lower=0.05, upper=0.10, size=1, device=self.device).item()
+-        )
+-        wp_throw_load[2] = (
+-            init_ee_pose[2] + math_utils.sample_uniform(lower=-0.16, upper=-0.08, size=1, device=self.device).item()
+-        )
+-
+-        wp_throw_hold = wp_throw_load.clone()
+-
+-        wp_release = align_y_pose.clone()
+-        wp_release[0] = (
+-            wp_throw_load[0].item()
+-            + math_utils.sample_uniform(lower=0.64, upper=0.84, size=1, device=self.device).item()
+-        )
+-        wp_release[2] = (
+-            init_ee_pose[2] + math_utils.sample_uniform(lower=0.08, upper=0.18, size=1, device=self.device).item()
+-        )
+-
+-        wp_pre_release = wp_throw_hold + 0.42 * (wp_release - wp_throw_hold)
+-
+-        wp_follow_through = align_y_pose.clone()
+-        wp_follow_through[0] = wp_release[0].item()
+-        wp_follow_through[2] = (
+-            init_ee_pose[2] + math_utils.sample_uniform(lower=-0.14, upper=-0.06, size=1, device=self.device).item()
+-        )
+-
+-        t_tilt = int(math_utils.sample_uniform(lower=100, upper=140, size=1, device=self.device).item())
+-        t_align = int(math_utils.sample_uniform(lower=230, upper=290, size=1, device=self.device).item())
+-        t_forward = int(math_utils.sample_uniform(lower=400, upper=410, size=1, device=self.device).item())
+-        t_load = int(math_utils.sample_uniform(lower=420, upper=440, size=1, device=self.device).item())
+-        t_hold = t_load + int(math_utils.sample_uniform(lower=80, upper=120, size=1, device=self.device).item())
+-        t_pre_release = t_hold + int(math_utils.sample_uniform(lower=8, upper=12, size=1, device=self.device).item())
+-        t_release = t_pre_release + int(math_utils.sample_uniform(lower=9, upper=12, size=1, device=self.device).item())
+-        t_follow = 800
+-
+-        # Gripper convention in this repo:
+-        # 1.0 = open, -1.0 = close
++        dev = self.device
++
++        theta = math.radians(float(os.environ.get("AMBENCH_TOSS_THETA", "25")))
++        d0 = float(os.environ.get("AMBENCH_TOSS_D0", "1.0"))    # wrist speed is capped ~1.2 m/s by the whole-body tracker: release closer and higher
++        z_rel = float(os.environ.get("AMBENCH_TOSS_ZREL", "1.45"))
++        aim_dx = float(os.environ.get("AMBENCH_TOSS_AIMX", "-0.15"))  # aim slightly short of the bin centre: a steep entry otherwise clips the far wall
++        k = float(os.environ.get("AMBENCH_TOSS_K", "0.87"))  # measured: 4 throws with k=1 landed 0.22-0.26 m short, horizontal speed 1.65 vs 1.95 commanded
++        run_up = float(os.environ.get("AMBENCH_TOSS_RUNUP", "0.8"))
++        follow = float(os.environ.get("AMBENCH_TOSS_FOLLOW", "0.4"))
++        hz = 120.0
++
++        tx, ty = float(target_pos[0].item()), float(target_pos[1].item())
++        u = torch.tensor([math.cos(theta), 0.0, math.sin(theta)], device=dev, dtype=init_ee_pose.dtype)
++
++        # release point of the wrist and of the ball
++        R = torch.tensor([tx - d0 + aim_dx, ty, z_rel], device=dev, dtype=init_ee_pose.dtype)  # aim_dx shifts the release point only
++        d = d0 - BALL_GRASP_OFFSET_X                       # launch speed solved for the nominal distance (release point -> bin centre)
++        h = BIN_RIM_Z - z_rel                              # height of the rim above the ball (negative: below)
++        denom = 2.0 * math.cos(theta) ** 2 * (d * math.tan(theta) - h)
++        v = math.sqrt(GRAVITY * d * d / denom) if denom > 1e-6 else 3.0
++        v_cmd = v / max(k, 0.05)
++
++        S = R - run_up * u
++        F = R + follow * u
++
++        # lateral alignment first (small y jitter keeps the data diverse), wrist level, slightly raised
++        align = init_ee_pose.clone()
++        align[1] = ty + math_utils.sample_uniform(lower=-0.02, upper=0.02, size=1, device=dev).item()
++        align[2] = init_ee_pose[2] + 0.05
++
++        t_align = int(math_utils.sample_uniform(lower=220, upper=280, size=1, device=dev).item())
++        t_S = t_align + 260
++        t_S_hold = t_S + 60
++        n_run = max(int(round(run_up * hz / v_cmd)), 2)
++        n_follow = max(int(round(follow * hz / v_cmd)), 2)
++        t_R = t_S_hold + n_run
++        t_F = t_R + n_follow
++        t_end = t_F + 240
++
++        self.toss_solution = dict(theta_deg=math.degrees(theta), d=d, h=h, v=v, v_cmd=v_cmd, k=k,
++                                  R=R.tolist(), S=S.tolist(), F=F.tolist(), t_R=t_R, n_run=n_run)
++
++        self._closed_loop = os.environ.get("AMBENCH_TOSS_CLOSED_LOOP", "0") == "1"
++        grip_after = -1.0 if self._closed_loop else 1.0  # open-loop: the waypoint at R opens the gripper
++        # Gripper convention: 1.0 = open, -1.0 = closed
+         self.waypoints = [
+             Waypoint(t=0, xyz=init_ee_pose, quat=identity_quat, gripper=-1.0),
+-            Waypoint(t=t_tilt, xyz=tilt_down_pose, quat=pitch_down_move_quat, gripper=-1.0),
+-            Waypoint(t=t_align, xyz=align_y_pose, quat=pitch_down_move_quat, gripper=-1.0),
+-            Waypoint(t=t_forward, xyz=forward_pose, quat=pitch_down_move_quat, gripper=-1.0),
+-            Waypoint(t=t_load, xyz=wp_throw_load, quat=pitch_down_quat, gripper=-1.0),
+-            Waypoint(t=t_hold, xyz=wp_throw_hold, quat=pitch_down_quat, gripper=-1.0),
+-            Waypoint(t=t_pre_release, xyz=wp_pre_release, quat=pitch_down_release_quat, gripper=-1.0),
+-            Waypoint(t=t_release, xyz=wp_release, quat=pitch_down_release_quat, gripper=1.0),
+-            Waypoint(t=t_follow, xyz=wp_follow_through, quat=pitch_down_quat, gripper=1.0),
++            Waypoint(t=t_align, xyz=align, quat=identity_quat, gripper=-1.0),
++            Waypoint(t=t_S, xyz=S, quat=identity_quat, gripper=-1.0),
++            Waypoint(t=t_S_hold, xyz=S, quat=identity_quat, gripper=-1.0),
++            Waypoint(t=t_R - 1, xyz=R - (v_cmd / hz) * u, quat=identity_quat, gripper=-1.0),
++            Waypoint(t=t_R, xyz=R, quat=identity_quat, gripper=grip_after),
++            Waypoint(t=t_F, xyz=F, quat=identity_quat, gripper=grip_after),
++            Waypoint(t=t_end, xyz=F, quat=identity_quat, gripper=grip_after),
+         ]
+-
+-        self._log_trajectory_summary(f"target_pos={target_pos}")
++        # closed-loop release (see advance): open when the ball's predicted landing point reaches the aim point
++        self._swing_start = t_S_hold
++        self._release_deadline = t_F + 30
++        self._release_step = None
++        self._aim_x = tx + aim_dx
++        self._aim_y = ty
++        self._lead = float(os.environ.get("AMBENCH_TOSS_LEAD", "0.10"))  # m: the fingers need ~5-8 steps to let go
++        self._log_trajectory_summary(f"target_pos={target_pos} toss={self.toss_solution}")
++
++    def _predicted_landing(self, obs_dict):
++        """Where the held ball would land (env-local x, y) if released now, from its current position and velocity."""
++        bp = obs_dict["ball_pos"]; bv = obs_dict["ball_lin_vel"]
++        x, y, z = float(bp[0].item()), float(bp[1].item()), float(bp[2].item())
++        vx, vy, vz = float(bv[0].item()), float(bv[1].item()), float(bv[2].item())
++        drop = max(z - BIN_RIM_Z, 0.0)
++        t_f = (vz + math.sqrt(vz * vz + 2.0 * GRAVITY * drop)) / GRAVITY
++        return x + vx * t_f, y + vy * t_f, t_f
++
++    def advance(self, obs, env_id) -> torch.Tensor:
++        action = super().advance(obs, env_id)
++        step = self.step_count - 1
++        if getattr(self, "_closed_loop", False) and getattr(self, "_release_step", None) is None and step >= getattr(self, "_swing_start", 10**9):
++            x_land, y_land, t_f = self._predicted_landing(obs["policy"][env_id])
++            if x_land >= self._aim_x - self._lead or step >= self._release_deadline:
++                self._release_step = step
++                self.toss_solution.update(release_step=step, x_land_pred=x_land, y_land_pred=y_land, t_flight=t_f,
++                                          deadline_hit=step >= self._release_deadline)
++        if getattr(self, "_release_step", None) is not None:
++            action[-1] = 1.0
++        return action
+diff --git a/source/ambench/ambench/policies/scripted/wipe_window.py b/source/ambench/ambench/policies/scripted/wipe_window.py
+index 86a76a8..8d51a64 100644
+--- a/source/ambench/ambench/policies/scripted/wipe_window.py
++++ b/source/ambench/ambench/policies/scripted/wipe_window.py
+@@ -4,6 +4,8 @@
+ 
+ from typing import TYPE_CHECKING, cast
+ 
++import os
++import torch
+ import isaaclab.sim as sim_utils
+ from omni.usd import get_context
+ from pxr import UsdGeom
+@@ -57,6 +59,45 @@ class WipeWindowPolicy(BasePolicy):
+ 
+         return visible_dots
+ 
++    def _sponge_force(self, env_id: int) -> float:
++        env = cast("WipeWindow", self.env)
++        try:
++            return float(torch.norm(env.contact_sensor.data.net_forces_w[env_id, 0, :]).item())
++        except Exception:
++            return 0.0
++
++    def _press_force(self, obs, env_id: int) -> float:
++        """Pressing force along the EE x axis. Default: wrist wrench (ee_wrench[0]); AMBENCH_WIPE_FSRC=sponge uses the
++        sponge contact sensor instead (blind to the gripper itself touching the window)."""
++        if os.environ.get("AMBENCH_WIPE_FSRC", "wrist") == "sponge":
++            return self._sponge_force(env_id)
++        try:
++            return float(obs["policy"][env_id]["ee_wrench"][0].item())
++        except Exception:
++            return self._sponge_force(env_id)
++
++    def advance(self, obs, env_id) -> torch.Tensor:
++        """Base waypoint tracking plus a force servo on the window-normal (x) axis while pressing."""
++        action = super().advance(obs, env_id)
++        t = self.step_count - 1
++        windows = getattr(self, "_press_windows", [])
++        if os.environ.get("AMBENCH_WIPE_FSERVO", "1") == "1" and any(t0 <= t <= t1 for t0, t1 in windows):
++            f = self._press_force(obs, env_id)
++            f_des = float(os.environ.get("AMBENCH_WIPE_FDES", "4.0"))
++            step = float(os.environ.get("AMBENCH_WIPE_FSTEP", "0.0005"))  # m per sim step
++            dx = getattr(self, "_press_dx", 0.0)
++            if f < f_des - 1.0:
++                dx += step                      # advance slowly into contact
++            elif f > 4.0 * f_des:
++                dx -= 8.0 * step                # hard overshoot: back off fast
++            elif f > f_des + 1.0:
++                dx -= 4.0 * step
++            self._press_dx = max(-0.03, min(0.06, dx))
++            action[0] = action[0] + self._press_dx
++        else:
++            self._press_dx = 0.0
++        return action
++
+     def generate_trajectory(self, obs, env_id: int = 0):
+         """Generate waypoint trajectory for wipe-window task."""
+         obs_dict = obs["policy"][env_id]
+@@ -101,26 +142,32 @@ class WipeWindowPolicy(BasePolicy):
+         # absolute x put the approach in the wrong place whenever it moved.
+         hover_offset_x = 0.40
+ 
++        self._press_windows = []
++        self._press_dx = 0.0
++        zoff = float(os.environ.get("AMBENCH_WIPE_ZOFF", "0.0"))   # 海绵中心在 EE 下方 8.8 cm，目标要抬高
+         for dot_pos in dot_positions:
++            dot_pos = dot_pos.clone(); dot_pos[2] += zoff
+             far = dot_pos.clone()
+             far[0] = dot_pos[0] - hover_offset_x
+             far[2] -= 0.1
+ 
+             close = far.clone()
+-            close[0] = dot_pos[0] - 0.25
++            close[0] = dot_pos[0] - float(os.environ.get("AMBENCH_WIPE_CLOSE", "0.30"))  # stand-off: PID overshoot on approach must not reach the window
+             close[1] += 0.01
+             close[2] += 0.1
+ 
+             contact = close.clone()
+-            contact[0] = dot_pos[0] - 0.215
++            # 接触深度：EE 目标到污点中心的 x 距离；越小压得越深，IK-PID 的接触力 ≈ 位置误差 × 增益。
++            contact[0] = dot_pos[0] - float(os.environ.get("AMBENCH_WIPE_CONTACT", "0.27"))  # just short of contact; force servo adds depth
+ 
+             sweep = contact.clone()
+-            sweep[1] -= 0.04
++            sweep[1] -= float(os.environ.get("AMBENCH_WIPE_SWEEP", "0.04"))
+ 
+             current_time += aim_time
+             waypoints.append(Waypoint(t=current_time, xyz=far, quat=identity_quat, gripper=-1.0))
+             current_time += forward_time
+             waypoints.append(Waypoint(t=current_time, xyz=close, quat=identity_quat, gripper=-1.0))
++            press_t0 = current_time  # from the 'close' pose onward the force servo is active
+             current_time += making_contact_time
+             waypoints.append(Waypoint(t=current_time, xyz=contact, quat=identity_quat, gripper=-1.0))
+             current_time += pause_time
+@@ -129,6 +176,12 @@ class WipeWindowPolicy(BasePolicy):
+             waypoints.append(Waypoint(t=current_time, xyz=sweep, quat=identity_quat, gripper=-1.0))
+             current_time += pause_time
+             waypoints.append(Waypoint(t=current_time, xyz=sweep, quat=identity_quat, gripper=-1.0))
++            self._press_windows.append((press_t0, current_time))
++            unpress_steps = int(os.environ.get("AMBENCH_WIPE_UNPRESS", "0"))
++            if unpress_steps > 0:
++                unpress = sweep.clone(); unpress[0] -= 0.05    # 先沿 -x 缓慢脱离窗面 5 cm，避免甩出海绵
++                current_time += unpress_steps
++                waypoints.append(Waypoint(t=current_time, xyz=unpress, quat=identity_quat, gripper=-1.0))
+             current_time += retreat_time
+             waypoints.append(Waypoint(t=current_time, xyz=far, quat=identity_quat, gripper=-1.0))
+ 
+diff --git a/source/ambench/ambench/robots/fa_hexa.py b/source/ambench/ambench/robots/fa_hexa.py
+index 73b8fb4..727b154 100644
+--- a/source/ambench/ambench/robots/fa_hexa.py
++++ b/source/ambench/ambench/robots/fa_hexa.py
+@@ -29,6 +29,12 @@ from ambench.utils.assets import LOCAL_ASSET_DIR
+ USD_FILE_PATH = f"{LOCAL_ASSET_DIR}/robots/hexa_scorpion.usd"
+ URDF_FILE_PATH = f"{LOCAL_ASSET_DIR}/robots/urdf/hexa_scorpion.urdf"
+ 
++def gripper_joint_pos_from_object_width(object_width: float) -> float:
++    """Return the symmetric finger position that fits an object at the grasp center."""
++    closed_inner_overlap = 0.006
++    return 0.5 * (object_width + closed_inner_overlap)
++
++
+ PROPELLER_VIZ_RELATIVE_PATHS = tuple(
+     f"base_link/visuals/prop_mount_{idx}/prop_spin_{idx}" for idx in range(FA_HEXA_PROP_SPIN_DIRS.numel())
+ )
+@@ -92,15 +98,15 @@ FA_HEXA_CONFIG = ArticulationCfg(
+         ),
+         "arm_lfinger_joint": ImplicitActuatorCfg(
+             joint_names_expr=["arm_lfinger_joint"],
+-            stiffness=100.0,
+-            damping=20.0,
++            stiffness=1000.0,
++            damping=30.0,
+             effort_limit_sim=1000.0,
+             velocity_limit_sim=5.0,
+         ),
+         "arm_rfinger_joint": ImplicitActuatorCfg(
+             joint_names_expr=["arm_rfinger_joint"],
+-            stiffness=100.0,
+-            damping=20.0,
++            stiffness=1000.0,
++            damping=30.0,
+             effort_limit_sim=1000.0,
+             velocity_limit_sim=5.0,
+         ),
+@@ -166,6 +172,7 @@ class FAHexaRobotSpecCfg(RobotSpecCfg):
+     end_effector: EndEffectorFrameCfg = EndEffectorFrameCfg()
+     gripper: GripperSpecCfg = GripperSpecCfg(
+         joint_names=("arm_lfinger_joint", "arm_rfinger_joint"),
++        joint_position_from_object_width=gripper_joint_pos_from_object_width,
+     )
+     max_arm_reach: float = 1.24
+     multirotor: MultirotorSpecCfg = MultirotorSpecCfg(
+diff --git a/source/ambench/ambench/tasks/base/base_env.py b/source/ambench/ambench/tasks/base/base_env.py
+index 578142a..384178b 100644
+--- a/source/ambench/ambench/tasks/base/base_env.py
++++ b/source/ambench/ambench/tasks/base/base_env.py
+@@ -10,6 +10,7 @@ import logging
+ from collections.abc import Sequence
+ 
+ import isaaclab.sim as sim_utils
++import isaaclab.utils.math as math_utils
+ import torch
+ from isaaclab.assets import Articulation, RigidObject
+ from isaaclab.envs import DirectRLEnv
+@@ -154,8 +155,9 @@ class BaseEnv(DirectRLEnv):
+         rigid_object: RigidObject,
+         env_ids: Sequence[int] | torch.Tensor | None = None,
+         grasp_width: float | None = None,
++        offset_local: tuple[float, float, float] | None = None,
+     ) -> None:
+-        """Place an object in the configured tool frame and close the gripper."""
++        """Place an object in the configured tool frame (or at ``offset_local`` from the EE link) and close the gripper."""
+         if env_ids is None or len(env_ids) == self.num_envs:
+             env_ids = self.robot._ALL_INDICES
+         elif not isinstance(env_ids, torch.Tensor):
+@@ -184,7 +186,12 @@ class BaseEnv(DirectRLEnv):
+             raise RuntimeError("Cannot place an object without an end-effector body.")
+         ee_state = self.robot.data.body_link_state_w[:, self.ee_link_idx, :]
+         root_state = rigid_object.data.default_root_state[env_ids].clone()
+-        root_state[:, :3] = self.robot_io.compute_tool_tip_pos_w(ee_state[env_ids])
++        if offset_local is None:
++            root_state[:, :3] = self.robot_io.compute_tool_tip_pos_w(ee_state[env_ids])
++        else:
++            off = torch.tensor(offset_local, device=self.device, dtype=ee_state.dtype)
++            off = off.unsqueeze(0).expand(len(env_ids), -1)
++            root_state[:, :3] = ee_state[env_ids, :3] + math_utils.quat_apply(ee_state[env_ids, 3:7], off)
+         root_state[:, 3:7] = self.robot_io.link_to_command_quat(ee_state[env_ids, 3:7])
+         root_state[:, 7:] = 0.0
+         rigid_object.write_root_state_to_sim(root_state, env_ids=env_ids)
+@@ -245,6 +252,73 @@ class BaseEnv(DirectRLEnv):
+         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids_tensor)
+         self.control_pipeline.reset(default_root_state, env_ids_tensor)
+ 
++    def _make_hollow_bin(self, prim_path_expr: str, size: tuple[float, float, float], wall: float = 0.01) -> int:
++        """Replace a bin's mesh collider by exact box colliders (bottom + 4 walls) so objects can enter it.
++
++        The NVIDIA container asset is a kinematic rigid body with a plain mesh collider; PhysX cooks that as a convex
++        hull, i.e. a solid block. Must run before the simulation starts (called from _setup_scene).
++        """
++        import isaaclab.sim as sim_utils
++        from omni.usd import get_context
++        from pxr import Gf, Usd, UsdGeom, UsdPhysics
++
++        stage = get_context().get_stage()
++        sx, sy, sz = size
++        boxes = {  # name: (center xyz in the container frame, full extents)
++            "col_bottom": ((0.0, 0.0, wall / 2), (sx, sy, wall)),
++            "col_xneg": ((-sx / 2 + wall / 2, 0.0, sz / 2), (wall, sy, sz)),
++            "col_xpos": ((sx / 2 - wall / 2, 0.0, sz / 2), (wall, sy, sz)),
++            "col_yneg": ((0.0, -sy / 2 + wall / 2, sz / 2), (sx, wall, sz)),
++            "col_ypos": ((0.0, sy / 2 - wall / 2, sz / 2), (sx, wall, sz)),
++        }
++        n = 0
++        for root_path in sim_utils.find_matching_prim_paths(prim_path_expr):
++            root = stage.GetPrimAtPath(root_path)
++            for prim in Usd.PrimRange(root, Usd.TraverseInstanceProxies()):
++                if prim.IsA(UsdGeom.Mesh) and prim.HasAPI(UsdPhysics.CollisionAPI) and not prim.IsInstanceProxy():
++                    UsdPhysics.CollisionAPI(prim).GetCollisionEnabledAttr().Set(False)
++            for name, (center, ext) in boxes.items():
++                cube = UsdGeom.Cube.Define(stage, f"{root_path}/{name}")
++                cube.GetSizeAttr().Set(1.0)
++                cube.GetPurposeAttr().Set(UsdGeom.Tokens.guide)  # collider only, not rendered
++                xf = UsdGeom.Xformable(cube.GetPrim())
++                xf.ClearXformOpOrder()
++                xf.AddTranslateOp().Set(Gf.Vec3d(*center))
++                xf.AddScaleOp().Set(Gf.Vec3f(*ext))
++                UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
++            n += 1
++        return n
++
++    def _wrist_wrench_b(self) -> torch.Tensor | None:
++        """Wrist F/T sensor equivalent: reaction wrench of the fixed joint that carries ee_link, in the ee_link frame.
++
++        Includes everything downstream of the wrist: contact forces transmitted through a held tool (e.g. the sponge),
++        the held object's weight and inertial load. Shape (num_envs, 6) = [force_xyz, torque_xyz].
++        """
++        if getattr(self, "ee_link_idx", None) is None:
++            return None
++        try:
++            return self.robot.data.body_incoming_joint_wrench_b[:, self.ee_link_idx]
++        except Exception:
++            return None
++
++    def _inject_extra_obs(self, obs_buf):
++        """Append 'ee_wrench' to each per-env policy observation dict (opt-in for recording via state_keys)."""
++        policy_obs = obs_buf.get("policy") if isinstance(obs_buf, dict) else None
++        if not isinstance(policy_obs, list) or not policy_obs:
++            return obs_buf
++        wrench = self._wrist_wrench_b()
++        if wrench is None:
++            return obs_buf
++        for env_idx, env_obs in enumerate(policy_obs):
++            if isinstance(env_obs, dict) and "ee_wrench" not in env_obs:
++                env_obs["ee_wrench"] = wrench[env_idx].clone()
++        return obs_buf
++
++    def reset(self, seed: int | None = None, options: dict | None = None):
++        obs_buf, extras = super().reset(seed=seed, options=options)
++        return self._inject_extra_obs(obs_buf), extras
++
+     def step(self, action: torch.Tensor):
+         """Apply observation noise once to list or tensor policy observations."""
+         original_obs_noise = self.cfg.observation_noise_model
+@@ -271,4 +345,5 @@ class BaseEnv(DirectRLEnv):
+             elif isinstance(policy_obs, torch.Tensor):
+                 obs_buf["policy"] = self._observation_noise_model(policy_obs)
+ 
++        self._inject_extra_obs(obs_buf)  # after noise: the wrist wrench is not part of the noise model
+         return obs_buf, reward_buf, terminated, truncated, extras
+diff --git a/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env.py b/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env.py
+index 6602b7c..958b8dc 100644
+--- a/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env.py
++++ b/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env.py
+@@ -53,6 +53,9 @@ class FrameAssembly(BaseEnv):
+         frame_lifted = frame_pos[:, 2] > self._frame_reset_z + FRAME_LIFT_HEIGHT_THRESHOLD
+         return frame_placed_on_pegs, {
+             "frame_lifted": frame_lifted,
++            # 拆开两个轴：|Δx|<0.10 和 √(Δy²+Δz²)<0.05 哪一个先超
++            "frame_in_x": distance_x < self.cfg.frame_placement_tolerance_x,
++            "frame_in_yz": distance_yz < self.cfg.frame_placement_tolerance_yz,
+             "frame_placed_on_pegs": frame_placed_on_pegs,
+         }
+ 
+diff --git a/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env_cfg.py b/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env_cfg.py
+index 0ac1b0d..d3af6a3 100644
+--- a/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env_cfg.py
++++ b/source/ambench/ambench/tasks/frame_assembly/frame_assembly_env_cfg.py
+@@ -127,7 +127,7 @@ class FrameAssemblyEnvDefaultCfg(BaseEnvCfg):
+     frame_width = 0.5
+     frame_height = 0.5
+     frame_thickness = 0.025
+-    frame_mass = 0.01
++    frame_mass = 0.3
+ 
+     # Frame object configuration
+     frame_object_cfg: RigidObjectCfg = RigidObjectCfg(
+diff --git a/source/ambench/ambench/tasks/lemon_harvesting/lemon_harvesting_env.py b/source/ambench/ambench/tasks/lemon_harvesting/lemon_harvesting_env.py
+index 6b1040c..281ccb9 100644
+--- a/source/ambench/ambench/tasks/lemon_harvesting/lemon_harvesting_env.py
++++ b/source/ambench/ambench/tasks/lemon_harvesting/lemon_harvesting_env.py
+@@ -62,6 +62,8 @@ class LemonHarvesting(BaseEnv):
+ 
+         self.container = RigidObject(self.cfg.container_object_cfg)
+         self.scene.rigid_objects["container"] = self.container
++        n_bins = self._make_hollow_bin(self.cfg.container_object_cfg.prim_path, tuple(self.cfg.container_size))
++        print(f"[hollow-bin] replaced the bin mesh collider by box colliders in {n_bins} envs", flush=True)
+ 
+     def _get_success(self) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+         """Return lemon-delivery success and subtask criteria."""
+diff --git a/source/ambench/ambench/tasks/toss_ball/toss_ball_env.py b/source/ambench/ambench/tasks/toss_ball/toss_ball_env.py
+index c79719f..3d4294d 100644
+--- a/source/ambench/ambench/tasks/toss_ball/toss_ball_env.py
++++ b/source/ambench/ambench/tasks/toss_ball/toss_ball_env.py
+@@ -6,6 +6,7 @@ from __future__ import annotations
+ 
+ from collections.abc import Sequence
+ 
++import isaaclab.utils.math as math_utils
+ import torch
+ from isaaclab.assets import RigidObject
+ 
+@@ -27,6 +28,8 @@ class TossBall(BaseEnv):
+ 
+         self.container = RigidObject(self.cfg.container_object_cfg)
+         self.scene.rigid_objects["container"] = self.container
++        n_bins = self._make_hollow_bin(self.cfg.container_object_cfg.prim_path, tuple(self.cfg.container_size))
++        print(f"[hollow-bin] replaced the bin mesh collider by box colliders in {n_bins} envs", flush=True)
+ 
+         self.ball = RigidObject(self.cfg.ball_cfg)
+         self.scene.rigid_objects["ball"] = self.ball
+@@ -41,15 +44,28 @@ class TossBall(BaseEnv):
+         ball_delivered = ball_released & ball_entered_bin & robot_behind_bin
+         return ball_delivered, {
+             "ball_released": ball_released,
++            # 拆开这两条：ball_delivered 是三者的与，单看它分不出
++            # 「球没进桶」和「机体越过桶后 0.7 m 线」哪个才是失败原因。
++            "ball_entered_bin": ball_entered_bin,
++            "ball_in_x": self._ball_axis_flags[0],
++            "ball_in_y": self._ball_axis_flags[1],
++            "ball_in_z": self._ball_axis_flags[2],
++            "robot_behind_bin": robot_behind_bin,
+             "ball_delivered": ball_delivered,
+         }
+ 
++    def _ball_grasp_pos_w(self, ee_state: torch.Tensor) -> torch.Tensor:
++        """World position of the configured ball grasp point."""
++        off = torch.tensor(self.cfg.ball_grasp_offset_local, device=self.device, dtype=ee_state.dtype)
++        off = off.unsqueeze(0).expand(ee_state.shape[0], -1)
++        return ee_state[:, :3] + math_utils.quat_apply(ee_state[:, 3:7], off)
++
+     def _compute_ball_criteria(self) -> tuple[torch.Tensor, torch.Tensor]:
+         ball_pos = self.ball.data.root_pos_w
+         container_pos = self.container.data.root_pos_w
+         ee_state = self.robot.data.body_link_state_w[:, self.ee_link_idx, :]
+ 
+-        gripper_tip_pos = self.robot_io.compute_tool_tip_pos_w(ee_state)
++        gripper_tip_pos = self._ball_grasp_pos_w(ee_state)
+         released = torch.norm(ball_pos - gripper_tip_pos, dim=-1) >= self.cfg.release_distance_threshold
+ 
+         container_size = torch.tensor(self.cfg.container_size, device=self.device, dtype=ball_pos.dtype)
+@@ -62,6 +78,8 @@ class TossBall(BaseEnv):
+         in_x = (ball_pos[:, 0] >= goal_region_min[:, 0]) & (ball_pos[:, 0] <= goal_region_max[:, 0])
+         in_y = (ball_pos[:, 1] >= goal_region_min[:, 1]) & (ball_pos[:, 1] <= goal_region_max[:, 1])
+         in_z = (ball_pos[:, 2] >= goal_region_min[:, 2]) & (ball_pos[:, 2] <= goal_region_max[:, 2])
++        # 按轴缓存，供 _get_success 拆开上报（定位是瞄准问题还是判据区间问题）
++        self._ball_axis_flags = (in_x, in_y, in_z)
+         return released, in_x & in_y & in_z
+ 
+     def _get_observations(self) -> dict:
+@@ -145,4 +163,5 @@ class TossBall(BaseEnv):
+             self.ball,
+             env_ids=env_ids,
+             grasp_width=2.0 * self.cfg.ball_radius,
++            offset_local=self.cfg.ball_grasp_offset_local,
+         )
+diff --git a/source/ambench/ambench/tasks/toss_ball/toss_ball_env_cfg.py b/source/ambench/ambench/tasks/toss_ball/toss_ball_env_cfg.py
+index c92a8bd..e09db43 100644
+--- a/source/ambench/ambench/tasks/toss_ball/toss_ball_env_cfg.py
++++ b/source/ambench/ambench/tasks/toss_ball/toss_ball_env_cfg.py
+@@ -79,7 +79,7 @@ class TossBallEnvDefaultCfg(BaseEnvCfg):
+ 
+     # Ball setup. Ball pose is overridden on reset to place it at the gripper.
+     ball_radius = 0.04
+-    ball_mass = 0.01
++    ball_mass = 0.05
+     ball_cfg: RigidObjectCfg = RigidObjectCfg(
+         prim_path="/World/envs/env_.*/Ball",
+         spawn=sim_utils.SphereCfg(
+@@ -103,6 +103,9 @@ class TossBallEnvDefaultCfg(BaseEnvCfg):
+     # This avoids counting balls that settle on the side wall or near the top rim.
+     success_robot_behind_bin_threshold = 0.7
+     release_distance_threshold = 0.12
++    # Where the ball is held at reset, in the EE-link frame. FA-Hexa fingers span x=0.074..0.194 from the
++    # EE link; the default tool tip (0.18) put the ball at the fingertip ends and it was squeezed out.
++    ball_grasp_offset_local = (0.13, 0.0, 0.0)
+ 
+     def __post_init__(self):
+         super().__post_init__()
+diff --git a/source/ambench/ambench/tasks/wipe_window/wipe_window_env.py b/source/ambench/ambench/tasks/wipe_window/wipe_window_env.py
+index 21d8d85..19cd10a 100644
+--- a/source/ambench/ambench/tasks/wipe_window/wipe_window_env.py
++++ b/source/ambench/ambench/tasks/wipe_window/wipe_window_env.py
+@@ -6,6 +6,7 @@ from __future__ import annotations
+ 
+ from collections.abc import Sequence
+ 
++import os
+ import isaaclab.sim as sim_utils
+ import torch
+ from isaaclab.assets import RigidObject
+@@ -164,8 +165,19 @@ class WipeWindow(BaseEnv):
+         self._grasp_rigid_object_at_ee(
+             self.sponge_object,
+             env_ids=env_ids,
+-            grasp_width=self.cfg.sponge_size[1],
++            grasp_width=float(os.environ.get("AMBENCH_WIPE_GRASP_WIDTH", self.cfg.sponge_size[1])),
+         )
++        if os.environ.get("AMBENCH_WIPE_DEBUG") == "1" and (env_ids == 0).any():
++            try:
++                _dots = torch.stack([d.data.root_pos_w[0] for d in self.dot_objects]).tolist()
++                _dots_sorted = sorted(_dots, key=lambda v: (round(v[2], 3), round(v[1], 3)))
++                try:
++                    _mat = self.window_object.root_physx_view.get_material_properties()[0, 0].tolist()
++                except Exception:
++                    _mat = "?"
++                print(f"[wipe-reset] dots(sorted z,y)={[[round(c,3) for c in v] for v in _dots_sorted]} window_material(static,dyn,rest)={_mat}", flush=True)
++            except Exception as _e:
++                print(f"[wipe-reset] ? {type(_e).__name__}: {_e}", flush=True)
+ 
+     def _remove_stains_on_contact(self) -> None:
+         """Remove dots when sponge contact conditions are met."""
+@@ -185,6 +197,25 @@ class WipeWindow(BaseEnv):
+         dot_positions = torch.stack([dot_object.data.root_pos_w for dot_object in self.dot_objects], dim=1)
+         distances = torch.norm(dot_positions - sponge_pos.unsqueeze(1), dim=-1)
+         current_contact = has_force.unsqueeze(1) & (distances <= self.cfg.stain_removal_contact_radius)
++        if os.environ.get("AMBENCH_WIPE_DEBUG") == "1" and int(self.episode_length_buf[0].item()) % 20 == 0:
++            _f = force_magnitudes[0].item(); _d = distances[0]; _i = int(torch.argmin(_d).item())
++            _dx = (dot_positions[0, _i, 0] - sponge_pos[0, 0]).item()
++            try:
++                _ee_state = self.robot.data.body_link_state_w[:, self.ee_link_idx, :]
++                _tip = self.robot_io.compute_tool_tip_pos_w(_ee_state)[0]
++                _g = self.robot.data.joint_pos[0, self.gripper_joint_ids].tolist()
++                _tipinfo = f"tip={[round(v,3) for v in _tip.tolist()]} d_tip={torch.norm(sponge_pos[0]-_tip).item():.3f} fingers={[round(v,4) for v in _g]}"
++                try:
++                    _w = self.robot.data.body_incoming_joint_wrench_b[0, self.ee_link_idx]
++                    _tipinfo += f" wrist_F={[round(v,2) for v in _w[:3].tolist()]} |F|={torch.norm(_w[:3]).item():.2f} wrist_M={[round(v,3) for v in _w[3:].tolist()]}"
++                except Exception as _e2:
++                    _tipinfo += f" wrist=? ({type(_e2).__name__})"
++            except Exception as _e:
++                _tipinfo = f"tip=? ({type(_e).__name__})"
++            print(f"[wipe-dbg] t={int(self.episode_length_buf[0].item())} force={_f:6.2f}N min_dist={_d[_i].item():.3f}m (dot{_i}, dx={_dx:+.3f}) "
++                  f"has_force={bool(has_force[0])} visible={self._stain_visible_buf[0].tolist()} "
++                  f"sp={[round(v,3) for v in sponge_pos[0].tolist()]} dot={[round(v,3) for v in dot_positions[0,_i].tolist()]} "
++                  f"{_tipinfo}", flush=True)
+         current_contact &= self._stain_visible_buf
+ 
+         # Detect rising edges (transition from no-contact to contact)
+diff --git a/source/ambench_learn/ambench_learn/policies/dp/universal_manipulation_interface/diffusion_policy/model/common/lr_scheduler.py b/source/ambench_learn/ambench_learn/policies/dp/universal_manipulation_interface/diffusion_policy/model/common/lr_scheduler.py
+index f4c0533..a89d37f 100644
+--- a/source/ambench_learn/ambench_learn/policies/dp/universal_manipulation_interface/diffusion_policy/model/common/lr_scheduler.py
++++ b/source/ambench_learn/ambench_learn/policies/dp/universal_manipulation_interface/diffusion_policy/model/common/lr_scheduler.py
+@@ -1,5 +1,7 @@
++from typing import Optional, Union
++
+ from diffusers.optimization import (
+-    Union, SchedulerType, Optional,
++    SchedulerType,
+     Optimizer, TYPE_TO_SCHEDULER_FUNCTION
+ )
+ 
+diff --git a/source/ambench_learn/ambench_learn/policies/pi/eval.py b/source/ambench_learn/ambench_learn/policies/pi/eval.py
+index f42d91e..0863943 100644
+--- a/source/ambench_learn/ambench_learn/policies/pi/eval.py
++++ b/source/ambench_learn/ambench_learn/policies/pi/eval.py
+@@ -10,6 +10,11 @@ from __future__ import annotations
+ 
+ import argparse
+ import collections
++import time
++import faulthandler
++import signal
++import os
++import json
+ import socket
+ from urllib.parse import urlparse
+ 
+@@ -35,6 +40,37 @@ add_common_eval_args(parser)
+ parser.add_argument("--prompt", type=str, default=None, help="Language instruction prompt (required).")
+ parser.add_argument("--host", type=str, default="localhost", help="Host running the remote OpenPI policy server.")
+ parser.add_argument("--port", type=int, default=8000, help="Port used by the remote OpenPI policy server.")
++parser.add_argument(
++    "--gripper-oracle",
++    action="store_true",
++    help=(
++        "诊断用：位置/姿态仍由策略输出，只把夹爪通道换成专家规则。"
++        "PushSlider 实测策略在 2%% 处、离抓取点 1.4 m 就合爪（专家在 61%% 处到位后才合），"
++        "两个模型都因此抓空。用这个隔离出夹爪是不是唯一瓶颈。"
++    ),
++)
++parser.add_argument(
++    "--chunk-overlap",
++    type=int,
++    default=0,
++    help=(
++        "相邻动作块的重叠步数（0 = 关闭，行为不变）。开启后在队列还剩 N 步时就"
++        "提前推理下一块，并把重叠区按线性斜坡从旧块过渡到新块。"
++        "ACT 的 temporal ensembling 是每步推理后加权平均，这里 274ms/次的延迟"
++        "做不到；重叠融合是同一思路的可负担版本，治的是块之间硬切造成的指令锯齿。"
++    ),
++)
++parser.add_argument(
++    "--action-smoothing",
++    type=float,
++    default=0.0,
++    help=(
++        "对下发给控制器的末端目标做一阶低通：cmd = a*new + (1-a)*prev。"
++        "0 = 关闭（默认，行为不变）。动作块之间没有融合，flow matching 每次"
++        "重新采样会让相邻块指向不同方向，拼接处形成锯齿；PID 追锯齿会积累"
++        "误差直到推力饱和。实测 PushSlider 的指令抖动度达 84.9（专家 1.2）。"
++    ),
++)
+ parser.add_argument(
+     "--n-action-steps",
+     type=int,
+@@ -60,6 +96,24 @@ parser.add_argument(
+     help="Maximum time to wait for the policy server TCP connection before starting Isaac Sim.",
+ )
+ 
++parser.add_argument(
++    "--expert-policy",
++    action="store_true",
++    help=(
++        "诊断用：不连策略服务，用环境自带的脚本专家在环产生绝对末端目标，"
++        "走和模型完全相同的 stride / 队列 / IK-PID 执行链。用来区分"
++        "'数据-评测接口有问题' 和 '模型没学会'。"
++    ),
++)
++parser.add_argument(
++    "--expert-hold",
++    type=int,
++    default=0,
++    help=(
++        "专家目标的保持步数：0 = 等于 action_execution_stride（按 --policy-target-hz 采样，"
++        "模拟模型的 20 Hz 零阶保持）；1 = 每仿真步更新（等价录制时的 120 Hz）。"
++    ),
++)
+ # append AppLauncher cli args
+ AppLauncher.add_app_launcher_args(parser)
+ # parse the arguments
+@@ -81,11 +135,12 @@ if args_cli.connect_timeout_s <= 0:
+ parsed_host = urlparse(args_cli.host if "://" in args_cli.host else f"//{args_cli.host}")
+ socket_host = parsed_host.hostname or args_cli.host
+ socket_port = parsed_host.port or args_cli.port
+-try:
+-    with socket.create_connection((socket_host, socket_port), timeout=args_cli.connect_timeout_s):
+-        pass
+-except OSError as error:
+-    parser.error(f"Could not connect to OpenPI server at {socket_host}:{socket_port}: {error}")
++if not args_cli.expert_policy:
++    try:
++        with socket.create_connection((socket_host, socket_port), timeout=args_cli.connect_timeout_s):
++            pass
++    except OSError as error:
++        parser.error(f"Could not connect to OpenPI server at {socket_host}:{socket_port}: {error}")
+ 
+ # Launch the simulator.
+ args_cli.enable_cameras = True
+@@ -120,6 +175,95 @@ from ambench_learn.policies.pi.eval_utils import (
+ np.set_printoptions(precision=4, suppress=True, floatmode="fixed")
+ 
+ 
++def _blend_ee(a_old, a_new, w):
++    """按权重 w 把旧块的第 i 步和新块的第 i 步融合（w=0 全旧，w=1 全新）。
++
++    位置和夹爪线性插值；四元数先对齐符号（q 与 -q 同一旋转）再插值归一化。
++    维度不是 8 时不做假设，直接返回新块的值。
++    """
++    if a_old.shape[-1] != 8 or a_new.shape[-1] != 8:
++        return a_new
++    out = a_new.clone()
++    out[..., :3] = (1.0 - w) * a_old[..., :3] + w * a_new[..., :3]
++    out[..., 7] = (1.0 - w) * a_old[..., 7] + w * a_new[..., 7]
++    q_o, q_n = a_old[..., 3:7], a_new[..., 3:7]
++    if float(torch.dot(q_o.flatten(), q_n.flatten())) < 0.0:
++        q_o = -q_o
++    q = (1.0 - w) * q_o + w * q_n
++    n = torch.linalg.norm(q)
++    out[..., 3:7] = q / n if float(n) > 1e-8 else q_n
++    return out
++
++
++def _grasp_point(env, env_index):
++    """复刻专家算抓取点的方式：滑块位置沿墙面法向退 grasp_dist_offset。"""
++    try:
++        from ambench.policies.utils import compute_wall_axes
++        u = env.unwrapped
++        slider = u.scene["slider"]
++        wall = u.scene["wall"]
++        idx = slider.find_bodies("Slider")[0][0]
++        pos_w = slider.data.body_pos_w[env_index, idx]
++        normal_w, _, _ = compute_wall_axes(wall.data.root_quat_w[env_index])
++        return (pos_w - u.scene.env_origins[env_index]) - normal_w * 0.23
++    except Exception:
++        return None
++
++
++def _oracle_gripper(env, env_index, state):
++    """到抓取点附近就合爪，之后保持闭合（专家是到位停稳再合，这里用距离近似）。"""
++    if state.get("closed"):
++        return -1.0
++    g = _grasp_point(env, env_index)
++    if g is None:
++        return 1.0
++    u = env.unwrapped
++    ee = u.robot.data.body_link_state_w[env_index, u.ee_link_idx, 0:3] - u.scene.env_origins[env_index]
++    if float(torch.linalg.norm(ee - g)) < 0.15:
++        state["closed"] = True
++        return -1.0
++    return 1.0
++
++
++_INFER_LOG = None  # AMBENCH_LOG_INFER=1 时由 main 打开
++_EXPERTS: list = []   # --expert-policy 时每个 env 一个脚本专家实例
++
++
++
++class _EeTargetSmoother:
++    """对末端目标做一阶低通。位置/夹爪线性插值，四元数按最短弧插值。
++
++    只作用在下发给控制器的指令上，不改变策略本身的输出。
++    """
++
++    def __init__(self, alpha: float):
++        self.alpha = float(alpha)
++        self.prev = None
++
++    def reset(self):
++        self.prev = None
++
++    def __call__(self, action: "torch.Tensor") -> "torch.Tensor":
++        if self.alpha <= 0.0 or self.alpha >= 1.0:
++            return action
++        if self.prev is None or action.shape[-1] != 8:
++            self.prev = action.clone()
++            return action
++        a = self.alpha
++        out = action.clone()
++        out[..., :3] = a * action[..., :3] + (1.0 - a) * self.prev[..., :3]
++        out[..., 7] = a * action[..., 7] + (1.0 - a) * self.prev[..., 7]
++        # 四元数：先对齐符号（q 与 -q 同一旋转），再插值归一化
++        q_new, q_old = action[..., 3:7], self.prev[..., 3:7]
++        if float(torch.dot(q_new.flatten(), q_old.flatten())) < 0.0:
++            q_new = -q_new
++        q = a * q_new + (1.0 - a) * q_old
++        n = torch.linalg.norm(q)
++        out[..., 3:7] = q / n if float(n) > 1e-8 else q_old
++        self.prev = out.clone()
++        return out
++
++
+ def _run_rollout_batch(
+     args: argparse.Namespace,
+     client: Any,
+@@ -136,6 +280,8 @@ def _run_rollout_batch(
+         raw_obs, _ = env.reset()
+     else:
+         raw_obs, _ = env.reset(seed=batch.seed)
++    for _p in _EXPERTS:
++        _p.reset()
+ 
+     action_plans: list[collections.deque[torch.Tensor]] = [collections.deque() for _ in env_indices]
+     success = [False for _ in env_indices]
+@@ -144,7 +290,10 @@ def _run_rollout_batch(
+     termination_reasons = ["not_evaluated" if done[env_index] else "timeout" for env_index in env_indices]
+     success_criteria = [SuccessCriteriaTracker(env_index=env_index) for env_index in env_indices]
+     latest_tracking: list[dict[str, Any] | None] = [None for _ in env_indices]
++    smoothers = [_EeTargetSmoother(getattr(args, "action_smoothing", 0.0)) for _ in env_indices]
++    grip_state = [{} for _ in env_indices]
+     for env_index in tracked_env_indices:
++        grip_state[env_index].clear()
+         eval_run.start_rollout(rollout_idx=batch.start + env_index, batch_env_index=env_index)
+ 
+     stop_evaluation = False
+@@ -168,6 +317,58 @@ def _run_rollout_batch(
+                     env_index=env_index,
+                 )
+             else:
++                _ov = int(getattr(args, "chunk_overlap", 0)) * int(args.action_execution_stride)
++                if _ov > 0 and 0 < len(action_plans[env_index]) <= _ov:
++                    # 队列尚未排空就预取下一块，并把重叠区融合掉
++                    example = build_openpi_example(
++                        raw_obs, env, env_index=env_index,
++                        action_semantics=action_semantics, prompt=args.prompt,
++                    )
++                    _t0 = time.perf_counter()
++                    output = client.infer(example)
++                    _lat_ms = (time.perf_counter() - _t0) * 1e3
++                    actions = np.asarray(output["actions"], dtype=np.float32).copy()
++                    if _INFER_LOG is not None:
++                      try:
++                        _INFER_LOG.write(json.dumps({
++                            "event": "infer", "blend": True,
++                            "rollout_idx": batch.start + env_index,
++                            "env_index": env_index,
++                            "at_step": executed_steps[env_index],
++                            "latency_ms": round(_lat_ms, 2),
++                            "prompt": args.prompt,
++                            "chunk_shape": list(actions.shape),
++                            "n_executed": int(args.n_action_steps),
++                            "actions": np.round(actions, 5).tolist(),
++                        }, ensure_ascii=False) + "\n")
++                        _INFER_LOG.flush()
++                      except Exception:
++                        pass
++                    fresh = expand_policy_actions(
++                        actions, env, action_semantics=action_semantics,
++                        n_action_steps=int(args.n_action_steps),
++                        action_execution_stride=int(args.action_execution_stride),
++                        env_index=env_index,
++                    )
++                    old = list(action_plans[env_index])
++                    new = list(fresh)
++                    k = min(len(old), len(new))
++                    blended = collections.deque()
++                    for i in range(k):
++                        w = (i + 1) / (k + 1)          # 旧 -> 新 的线性斜坡
++                        blended.append(_blend_ee(old[i], new[i], w))
++                    for a_ in new[k:]:
++                        blended.append(a_)
++                    action_plans[env_index] = blended
++                if not action_plans[env_index] and _EXPERTS:
++                    # 专家在环：把 120 Hz 的专家轨迹按 hold 步采样一次，再零阶保持 hold 步，
++                    # 精确模拟"20 Hz 目标 + stride 展开"的模型执行路径。
++                    _hold = int(args.expert_hold)
++                    _row = None
++                    for _ in range(_hold):
++                        _row = _EXPERTS[env_index].advance(raw_obs, env_index)
++                    _row = torch.as_tensor(_row).reshape(-1).to(device=env.unwrapped.device, dtype=torch.float32)
++                    action_plans[env_index] = collections.deque([_row.clone() for _ in range(_hold)])
+                 if not action_plans[env_index]:
+                     example = build_openpi_example(
+                         raw_obs,
+@@ -176,8 +377,34 @@ def _run_rollout_batch(
+                         action_semantics=action_semantics,
+                         prompt=args.prompt,
+                     )
++                    _t0 = time.perf_counter()
+                     output = client.infer(example)
++                    _lat_ms = (time.perf_counter() - _t0) * 1e3
+                     actions = np.asarray(output["actions"], dtype=np.float32).copy()
++                    if _INFER_LOG is not None:
++                      try:
++                          # 完整记录一轮推理：输入状态 + 模型输出的全部 H 步
++                          # （执行循环只消费前 n_action_steps 步，其余丢弃）
++                          _INFER_LOG.write(json.dumps({
++                              "event": "infer",
++                              "rollout_idx": batch.start + env_index,
++                              "env_index": env_index,
++                              "at_step": executed_steps[env_index],
++                              "latency_ms": round(_lat_ms, 2),
++                              "prompt": args.prompt,
++                              "input_state": {
++                                  k: (np.asarray(v).ravel().tolist()
++                                      if isinstance(v, np.ndarray) and v.ndim <= 1 else
++                                      (list(np.asarray(v).shape) if isinstance(v, np.ndarray) else v))
++                                  for k, v in example.items()
++                              },
++                              "chunk_shape": list(actions.shape),
++                              "n_executed": int(args.n_action_steps),
++                              "actions": np.round(actions, 5).tolist(),
++                          }, ensure_ascii=False) + "\n")
++                          _INFER_LOG.flush()
++                      except Exception:
++                        pass
+                     action_plans[env_index] = expand_policy_actions(
+                         actions,
+                         env,
+@@ -186,7 +413,10 @@ def _run_rollout_batch(
+                         action_execution_stride=int(args.action_execution_stride),
+                         env_index=env_index,
+                     )
+-                action_row = action_plans[env_index].popleft()
++                action_row = smoothers[env_index](action_plans[env_index].popleft())
++                if getattr(args, "gripper_oracle", False) and action_row.shape[-1] == 8:
++                    action_row = action_row.clone()
++                    action_row[..., 7] = _oracle_gripper(env, env_index, grip_state[env_index])
+             action_rows.append(action_row.reshape(env.action_space.shape[-1]))
+         actions_env = torch.stack(action_rows, dim=0).to(device=env.unwrapped.device, dtype=torch.float32)
+ 
+@@ -261,9 +491,15 @@ def _run_rollout_batch(
+ 
+ 
+ def main() -> None:
++    # 挂死时 kill -USR1 <pid> 打印全部线程栈（py-spy 跨容器 ptrace 不通）
++    faulthandler.register(signal.SIGUSR1, all_threads=True)
+     args = args_cli
+-    client = websocket_client_policy.WebsocketClientPolicy(host=socket_host, port=socket_port)
+-    server_metadata = client.get_server_metadata()
++    if args.expert_policy:
++        client = None
++        server_metadata = {"expert_policy": True}
++    else:
++        client = websocket_client_policy.WebsocketClientPolicy(host=socket_host, port=socket_port)
++        server_metadata = client.get_server_metadata()
+     run_dir = resolve_eval_output_dir(policy="PI", task=args.task, output_dir=args.output_dir)
+ 
+     scene_camera_cfg = (
+@@ -285,6 +521,18 @@ def main() -> None:
+     if args.policy_target_hz is not None:
+         args.action_execution_stride = compute_stride(env_fps, int(args.policy_target_hz))
+     action_semantics = _resolve_eval_action_semantics(env)
++    _EXPERTS.clear()
++    expert_entry = None
++    if args.expert_policy:
++        # 和 scripts/data/record_demos_scripted.py 同一套解析：环境 spec 里声明的脚本专家
++        import importlib
++        expert_entry = gym.spec(args.task).kwargs["scripted_policy_entry_point"]
++        _mod, _cls = expert_entry.split(":")
++        PolicyClass = getattr(importlib.import_module(_mod), _cls)
++        for _ in range(env.unwrapped.num_envs):
++            _EXPERTS.append(PolicyClass(env=env, inject_noise=False))
++        args.expert_hold = int(args.expert_hold) or int(args.action_execution_stride)
++        print(f"[expert] {expert_entry}  hold={args.expert_hold} env-steps", flush=True)
+     video_camera_names = validate_video_camera_names(env, args.video_camera_names) if args.save_video else []
+ 
+     # Record the resolved policy and execution settings with the evaluation.
+@@ -294,14 +542,32 @@ def main() -> None:
+             "n_action_steps": args.n_action_steps,
+             "policy_target_hz": args.policy_target_hz,
+             "action_execution_stride": args.action_execution_stride,
++            "action_smoothing": args.action_smoothing or None,
++            "chunk_overlap": args.chunk_overlap or None,
++            "gripper_oracle": bool(getattr(args, "gripper_oracle", False)) or None,
++            "expert_policy": expert_entry,
++            "expert_hold": int(args.expert_hold) if args.expert_policy else None,
+         }.items()
+         if value is not None
+     }
++    global _INFER_LOG
++    if os.environ.get("AMBENCH_LOG_INFER") == "1":
++        # 诊断用的日志绝不能拖垮评测本身：这里出任何问题都只是少一份日志。
++        # （上一版这里的 f-string 写错抛了 NameError，Isaac Sim 的渲染线程
++        #  不随主线程退出，进程就静默挂死，stderr 缓冲也没刷出来。）
++        try:
++            _path = run_dir / "infer_log.jsonl"
++            _INFER_LOG = _path.open("w")
++            print(f"[infer-log] 逐轮推理写入 {_path}", flush=True)
++        except Exception as _exc:
++            _INFER_LOG = None
++            print(f"[infer-log] 关闭（{type(_exc).__name__}: {_exc}）", flush=True)
++
+     eval_run = EvalRun(
+         output_dir=run_dir,
+         policy="PI",
+         task=args.task,
+-        policy_source=f"ws://{socket_host}:{socket_port}",
++        policy_source=(f"expert://{expert_entry}" if args.expert_policy else f"ws://{socket_host}:{socket_port}"),
+         requested_rollouts=args.num_rollouts,
+         num_envs=args.num_envs,
+         action_semantics=action_semantics,

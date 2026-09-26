@@ -1,0 +1,17 @@
+# 密钥
+.env
+**/.env
+# Python 环境与缓存
+.venv/
+**/.venv/
+__pycache__/
+*.pyc
+# 大体积数据：可由脚本从 HPC 重新生成，见 vlm_pilot/README.md
+vlm_pilot/data/
+vlm_pilot/inputs/**/tiles/
+vlm_pilot/inputs/**/video.mp4
+vlm_pilot/run_pilot.py.bak
+# 第三方论文 PDF：arXiv 默认许可不允许再分发，请从原链接下载
+docs/literature/**/*.pdf
+# 系统文件
+.DS_Store

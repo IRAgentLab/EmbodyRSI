@@ -1,0 +1,273 @@
+<title>AM-Bench 成绩对照</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F5F7F5; --surface:#FFFFFF; --line:#D9DED9; --line-2:#EAEEEA;
+  --ink:#1B1F1D; --ink-2:#4A524D; --ink-3:#7A827D;
+  --ours:#0F6E6E; --ours-soft:#DCEEEC; --paper:#7A5C2E; --paper-soft:#F0E8DA;
+  --ok:#2E7D4F; --ok-soft:#DFF0E5; --bad:#B23A3A; --bad-soft:#F6DFDF; --warn:#A8720B; --warn-soft:#F7ECD2;
+  --h0:#F2F4F2; --h1:#E3ECE8; --h2:#CBDFD8; --h3:#A9CCC3; --h4:#7FB3A8; --h5:#4F9488;
+  --serif:"Noto Serif SC","Songti SC",serif; --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB",sans-serif; --mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#141817; --surface:#1C2120; --line:#2E3634; --line-2:#252C2A;
+  --ink:#E6EBE8; --ink-2:#B4BDB8; --ink-3:#7F8A85;
+  --ours:#5FC2B8; --ours-soft:#173634; --paper:#D2A86A; --paper-soft:#332A1A;
+  --ok:#6FCF97; --ok-soft:#1B3325; --bad:#F08A8A; --bad-soft:#3A1F1F; --warn:#E3B34F; --warn-soft:#3A3018;
+  --h0:#1C2120; --h1:#1F2E2B; --h2:#213E39; --h3:#245048; --h4:#286457; --h5:#2E7A6A;
+}}
+:root[data-theme="dark"]{
+  --bg:#141817; --surface:#1C2120; --line:#2E3634; --line-2:#252C2A;
+  --ink:#E6EBE8; --ink-2:#B4BDB8; --ink-3:#7F8A85;
+  --ours:#5FC2B8; --ours-soft:#173634; --paper:#D2A86A; --paper-soft:#332A1A;
+  --ok:#6FCF97; --ok-soft:#1B3325; --bad:#F08A8A; --bad-soft:#3A1F1F; --warn:#E3B34F; --warn-soft:#3A3018;
+  --h0:#1C2120; --h1:#1F2E2B; --h2:#213E39; --h3:#245048; --h4:#286457; --h5:#2E7A6A;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.65;padding-inline:clamp(16px,4vw,48px);padding-block:32px 72px}
+main{max-width:1180px;margin:0 auto}
+h1{font-family:var(--serif);font-size:clamp(26px,3.4vw,36px);font-weight:700;margin:0 0 6px;letter-spacing:.01em;text-wrap:balance}
+h2{font-family:var(--serif);font-size:20px;font-weight:600;margin:48px 0 6px;text-wrap:balance}
+h3{font-size:15px;font-weight:700;margin:22px 0 8px}
+p{max-width:72ch;margin:0 0 12px}
+.sub{color:var(--ink-3);font-family:var(--mono);font-size:12.5px;margin:0 0 18px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+code{font-family:var(--mono);font-size:.9em;background:var(--line-2);padding:1px 5px;border-radius:3px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:22px 0 8px}
+.kpi{background:var(--surface);border:1px solid var(--line);padding:14px 16px 12px}
+.kpi .l{font-size:12px;color:var(--ink-2);margin-bottom:4px}
+.kpi .v{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:var(--ink-3);margin-top:4px}
+.kpi.ours{border-color:var(--ours);border-width:1px 1px 1px 4px}
+.kpi.paper{border-color:var(--paper);border-width:1px 1px 1px 4px}
+.tw{overflow-x:auto;margin:14px 0 8px;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line-2);text-align:left;vertical-align:top}
+th{font-weight:500;color:var(--ink-2);font-size:12px;background:var(--h0);white-space:nowrap}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.grp td{background:var(--h0);font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:5px 10px}
+tr.avg td{font-weight:700;border-top:2px solid var(--line)}
+th.ours-h{color:var(--ours);border-top:3px solid var(--ours)}
+th.paper-h{color:var(--paper);border-top:3px solid var(--paper)}
+th.sep,td.sep{border-left:2px solid var(--line)}
+td.h0{background:var(--h0)} td.h1{background:var(--h1)} td.h2{background:var(--h2)} td.h3{background:var(--h3)} td.h4{background:var(--h4)} td.h5{background:var(--h5);color:#fff}
+td.best{outline:2px solid var(--ours);outline-offset:-2px;font-weight:600}
+td.na{color:var(--ink-3)}
+.pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:2px;background:var(--line-2);color:var(--ink-2);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.ours{background:var(--ours-soft);color:var(--ours)} .pill.paper{background:var(--paper-soft);color:var(--paper)}
+.legend{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:12px;color:var(--ink-2);margin:8px 0 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:14px 0}
+.box{background:var(--surface);border:1px solid var(--line);padding:14px 16px}
+.box h4{margin:0 0 6px;font-size:14px}
+.box p{font-size:13.5px;margin:0 0 6px}
+.ev{border-left:3px solid var(--ours);background:var(--surface);padding:12px 16px;margin:14px 0}
+.ev .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ours);margin-bottom:4px}
+.ev p{margin:0;font-size:14px}
+ul{margin:6px 0 12px;padding-left:20px} li{margin:3px 0;max-width:80ch}
+.small{font-size:12.5px;color:var(--ink-3)}
+</style>
+
+<main>
+<div class="eyebrow">飞衍智控 · AM-Bench · FA-Hexa · EE target + IK-PID · 每格 30 rollouts</div>
+<h1>AM-Bench 成绩对照</h1>
+<p class="sub">论文 arXiv 2609.00641 Table 2 / Table 10 · 我们的评测 2026-09-19 → 09-23 · 更新于 09-24 20:00 · 主指标：固定配方 5k/10k 取优 56.7</p>
+
+<div class="kpis">
+  <div class="kpi paper"><div class="l">论文 π₀.₅ MT→ST-FT</div><div class="v">52.22</div><div class="d">12 任务宏平均 · 论文最好</div></div>
+  <div class="kpi paper"><div class="l">论文 π₀.₅ MT-FT</div><div class="v">49.17</div><div class="d">我们 A 版对标的目标</div></div>
+  <div class="kpi ours"><div class="l">固定配方：mt7 → 双相机 ST（5k/10k 取优）</div><div class="v">56.7</div><div class="d">9 任务同一配方；10k 终点固定为 54.7；NDT 暂用 A 版起步值</div></div>
+  <div class="kpi"><div class="l">组合最优（跨版本按任务取优，参考）</div><div class="v">65.3</div><div class="d">双相机 ST ×6 + A 版 Lemon + B 版（NDT·RotateValve·Toss）</div></div>
+  <div class="kpi ours"><div class="l">我们 A 版（首次复现）</div><div class="v">39.4</div><div class="d">8 任务数据 · 全局归一化 · 40k</div></div>
+  <div class="kpi"><div class="l">论文 12 任务里我们能录制的</div><div class="v">11</div><div class="d">WipeWindow 专家 0/16，无数据</div></div>
+</div>
+<p class="small">宏平均按论文口径除以 12；我们没训练/没数据的任务记 0。同一模型同一设定复测的抖动约 ±9 个点（PegInHole A 版三次：73.3 / 56.7 / 66.7），单任务 10 个点以内的差异不要当结论。</p>
+
+<h2>各版本是什么</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>版本</th><th>训练数据</th><th>归一化统计</th><th>起点 → 步数 / batch</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill ours">A 版</span></td><td>8 任务各 80 集（原始 A10 录制：PressButton · PegInHole · PushSlider · OpenDoor · Lemon · PullLever · RotateValve · NDT）</td><td>8 任务全局分位数</td><td>π₀.₅ base → 40k / 32</td><td>论文 MT-FT 的直接复现。修掉 <code>--policy-target-hz</code> 缺失（stride 1 → 6）后的数字</td></tr>
+    <tr><td><span class="pill ours">B 版</span></td><td>11 任务（A 的 8 个 + 新录 CabinetPickPlace · FrameAssembly · TossBall）</td><td>11 任务全局分位数</td><td>π₀.₅ base → 40k / 32</td><td>补齐可录制任务；三个新任务专家成功率本身极低，数据量差异大</td></tr>
+    <tr><td><span class="pill ours">ST ownnorm</span></td><td>每任务单独 73–83 集</td><td><strong>本任务</strong>分位数</td><td>A 版 40k → 20k / 8</td><td>论文 MT→ST-FT 的对应物 + 单任务归一化。20k 步在 1.3 万帧上 ≈ 每帧 12 遍</td></tr>
+    <tr><td><span class="pill ours">mt7_no_ndt</span></td><td>A 的 8 任务去掉 NDT（550 集 / 97 923 帧）</td><td>7 任务全局分位数</td><td>π₀.₅ base → 40k / 32</td><td>NDT 的 z 量程 2.34 m 独占全局 z 轴（去掉后 5.7× 收窄），把污染源单独拿出去</td></tr>
+    <tr><td><span class="pill ours">双相机 ST</span></td><td>新录 80 集 / 任务，腕部 + 机载两路相机；PushSlider 另加 40 集注噪演示</td><td>本任务分位数</td><td>mt7 40k → 10k / 8（NDT 从 A 版起步）</td><td>方向一落地：<code>include_base_image=True</code>。PegInHole 63 → 96.7，PushSlider 0 → 100，PullLever 83 → 93.3，Lemon 78 → 86.7，Cabinet 0 → 13.3；RotateValve 反而掉到 26.7（待查）、NDT 持平</td></tr>
+    <tr><td><span class="pill ours">固定配方</span></td><td colspan="3">mt7（单相机 MT 40k）→ 每任务双相机 ST 10k，5k / 10k 两个 checkpoint 各评 30 条取较好者</td><td><strong>56.7</strong>（10k 终点固定 54.7；NDT 暂用 A 版起步值），超论文 ST-FT 52.22。这是对外报的主指标</td></tr>
+    <tr><td><span class="pill">组合最优</span></td><td colspan="3">双相机 ST ×6 + A 版 Lemon 90 + B 版（NDT 100 · RotateValve 86.7 · Toss 3.3）</td><td>65.3，仅作上界参考</td></tr>
+      </tbody>
+</table>
+</div>
+
+<h2>大表：每任务成功率（%）</h2>
+<p class="sub">左：论文 Table 10 · 右：我们 · 加框 = 我们各版本里该任务最好 · 色深 = 数值高</p>
+<div class="tw">
+<table id="big">
+  <thead>
+    <tr>
+      <th rowspan="2">任务</th>
+      <th class="paper-h" colspan="4">论文（FA-Hexa, 30 rollouts）</th>
+      <th class="ours-h sep" colspan="6">我们（同本体同接口，NACT=16，20 Hz）</th>
+    </tr>
+    <tr>
+      <th class="n">ACT</th><th class="n">DP</th><th class="n">π₀.₅ MT-FT</th><th class="n">π₀.₅ MT→ST</th>
+      <th class="n sep">A 版</th><th class="n">B 版</th><th class="n">ST ownnorm</th><th class="n">mt7_no_ndt</th><th class="n">固定配方<br><span class="small">mt7→双相机 ST，5k/10k 取优</span></th><th class="n">组合最优<br><span class="small">跨版本按任务取优</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="grp"><td colspan="11">Instantaneous interaction</td></tr>
+    <tr><td>PressButton</td><td class="n">80</td><td class="n">73.3</td><td class="n">100</td><td class="n">96.7</td><td class="n sep">100</td><td class="n">33.3</td><td class="n">93.3</td><td class="n">100</td><td class="n">100</td><td class="n">100</td></tr>
+    <tr><td>PegInHole</td><td class="n">40</td><td class="n">66.7</td><td class="n">100</td><td class="n">90</td><td class="n sep">73.3</td><td class="n">30.0</td><td class="n">10.0</td><td class="n">63.3</td><td class="n">96.7</td><td class="n">96.7</td></tr>
+    <tr class="grp"><td colspan="11">Object transport</td></tr>
+    <tr><td>FrameAssembly</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n sep na">—</td><td class="n">0</td><td class="n na">—</td><td class="n na">—</td><td class="n">0</td><td class="n">0</td></tr>
+    <tr><td>CabinetPickPlace</td><td class="n">10</td><td class="n">3.3</td><td class="n">0</td><td class="n">0</td><td class="n sep na">—</td><td class="n">0</td><td class="n na">—</td><td class="n na">—</td><td class="n">13.3</td><td class="n">13.3</td></tr>
+    <tr><td>LemonHarvesting</td><td class="n">3.3</td><td class="n">26.7</td><td class="n">66.7</td><td class="n">86.7</td><td class="n sep">90.0</td><td class="n">63.3</td><td class="n">86.7</td><td class="n">78.3<sup>‡</sup></td><td class="n">86.7</td><td class="n">90.0</td></tr>
+    <tr><td>TossBall</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">10</td><td class="n sep na">—</td><td class="n">3.3</td><td class="n na">—</td><td class="n na">—</td><td class="n">0</td><td class="n">3.3</td></tr>
+    <tr class="grp"><td colspan="11">Articulated object &amp; constrained contact</td></tr>
+    <tr><td>RotateValve</td><td class="n">13.3</td><td class="n">26.7</td><td class="n">0</td><td class="n">0</td><td class="n sep">26.7</td><td class="n">86.7</td><td class="n">66.7</td><td class="n">56.7</td><td class="n">26.7</td><td class="n">86.7</td></tr>
+    <tr><td>PushSlider</td><td class="n">23.3</td><td class="n">63.3</td><td class="n">100</td><td class="n">90</td><td class="n sep">0</td><td class="n">0</td><td class="n">3.3</td><td class="n">0</td><td class="n">100</td><td class="n">100</td></tr>
+    <tr><td>PullLever</td><td class="n">13.3</td><td class="n">83.3</td><td class="n">66.7</td><td class="n">83.3</td><td class="n sep">83.3</td><td class="n">86.7</td><td class="n">80.0</td><td class="n">83.3</td><td class="n">93.3</td><td class="n">93.3</td></tr>
+    <tr><td>OpenDoor</td><td class="n">100</td><td class="n">93.3</td><td class="n">100</td><td class="n">100</td><td class="n sep">100</td><td class="n">96.7</td><td class="n">96.7</td><td class="n">100</td><td class="n">100</td><td class="n">100</td></tr>
+    <tr><td>WipeWindow</td><td class="n">0</td><td class="n">3.3</td><td class="n">0</td><td class="n">10</td><td class="n sep na">—</td><td class="n na">—</td><td class="n na">—</td><td class="n na">—</td><td class="n">0</td><td class="n">0</td></tr>
+    <tr><td>NDT</td><td class="n">40</td><td class="n">56.7</td><td class="n">56.7</td><td class="n">60</td><td class="n sep">0</td><td class="n">100</td><td class="n">66.7</td><td class="n na">未训</td><td class="n">63.3<sup>§</sup></td><td class="n">100</td></tr>
+    <tr class="avg"><td>12 任务宏平均</td><td class="n">26.94</td><td class="n">41.39</td><td class="n">49.17</td><td class="n">52.22</td><td class="n sep">39.44</td><td class="n">41.67</td><td class="n">41.95</td><td class="n">40.14</td><td class="n">56.67</td><td class="n">65.28</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="legend">
+  <span><i class="sw" style="background:var(--h1)"></i>1–25</span><span><i class="sw" style="background:var(--h2)"></i>26–50</span><span><i class="sw" style="background:var(--h3)"></i>51–75</span><span><i class="sw" style="background:var(--h4)"></i>76–95</span><span><i class="sw" style="background:var(--h5)"></i>96–100</span>
+  <span>‡ 两次 30-rollout 复测 70.0 / 86.7 的均值</span>
+  <span>固定配方列 = mt7 起步双相机 ST（每任务 80 集，PushSlider 另加 40 集注噪）5k / 10k 取优。各任务 5k / 10k：PressButton 100/100 · PegInHole 63.3/96.7 · PushSlider 100/96.7 · OpenDoor 100/96.7 · PullLever —/93.3 · Lemon 66.7/86.7 · RotateValve 26.7/10.0 · NDT 46.7/63.3 · Cabinet —/13.3</span>
+  <span>组合最优列 = 所有版本里该任务最好的一格（Lemon 取 A 版 90，RotateValve / NDT / Toss 取 B 版）</span>
+  <span>§ NDT 暂为 A 版起步的结果，mt7 起步版训练中，出来后替换；PullLever 5k、Cabinet 5k 评测补跑中</span>
+  <span>† 单相机 ST 早停（已否决）：PegInHole 20.0/40.0 · RotateValve 53.3/60.0 · NDT 26.7/26.7</span>
+</div>
+
+<div class="ev">
+  <div class="lbl">怎么读这张表</div>
+  <p>9 个任务的双相机 ST 全部出齐：PegInHole 96.7、PushSlider 100、PressButton 100、OpenDoor 100、PullLever 93.3、Lemon 86.7、Cabinet 13.3（从 0 到非零，论文最高 10），NDT 63.3 持平，RotateValve 反而掉到 26.7 / 10.0（mt7 起点单相机也只有 53–60，这个任务的高分只在 B 版那套 11 任务全局量程下出现过）。固定配方（5k/10k 取优）宏平均 <strong>56.7，超过论文最好的 ST-FT 52.22</strong>（10k 终点固定为 54.7）；跨版本按任务取优可到 65.3，只作上界参考。剩余上限在 RotateValve（为什么只有 B 版行）、Cabinet（13.3）和三个专家做不了的任务。</p>
+</div>
+
+<h2>换基座：OpenDM DM0.5（6B，LoRA，9 任务双相机联合训练 10k 步）</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>任务</th><th class="n">DM0.5 联合 10k</th><th class="n">π₀.₅ mt7 联合（单相机）</th><th class="n">π₀.₅ 双相机 ST（5k/10k 取优）</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>PressButton</td><td class="n">100.0</td><td class="n">100.0</td><td class="n">100.0</td><td>持平</td></tr>
+    <tr><td>PegInHole</td><td class="n">60.0</td><td class="n">63.3</td><td class="n">96.7</td><td>与 π₀.₅ 联合版相当，单任务后训练仍是大头</td></tr>
+    <tr><td>PushSlider</td><td class="n">83.3</td><td class="n">0.0</td><td class="n">100.0</td><td>联合训练就能学会（有机载视角 + 注噪集）</td></tr>
+    <tr><td>RotateValve</td><td class="n">50.0</td><td class="n">56.7</td><td class="n">26.7</td><td>联合版好于 π₀.₅ 双相机 ST</td></tr>
+    <tr><td>OpenDoor</td><td class="n">56.7</td><td class="n">100.0</td><td class="n">100.0</td><td>明显落后</td></tr>
+    <tr><td>PullLever</td><td class="n">46.7</td><td class="n">83.3</td><td class="n">93.3</td><td>明显落后</td></tr>
+    <tr><td>LemonHarvesting</td><td class="n">90.0</td><td class="n">78.3</td><td class="n">86.7</td><td>领先</td></tr>
+    <tr><td>CabinetPickPlace</td><td class="n">0.0</td><td class="n na">—</td><td class="n">13.3</td><td>长程任务两家都不行</td></tr>
+    <tr><td>NDT</td><td class="n">33.3</td><td class="n na">—</td><td class="n">63.3</td><td>落后</td></tr>
+    <tr class="avg"><td>9 任务平均</td><td class="n">57.8</td><td class="n na">—</td><td class="n">75.6</td><td>π₀.₅ 列含单任务后训练，口径占优</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="small">同一份 764 集双相机数据（9 任务，20 Hz，chunk 50）；DM0.5 只训了 10k 步（约 2 个 epoch，样本量是 π₀.₅ MT 40k 的四分之一），且没做单任务后训练。每格 30 rollouts。续训到 40k 步（每 10k 存档）正在跑，跑完按 40k 重评，届时与 π₀.₅ MT-FT 同口径。Being-H0.5 训练已暂停。</p>
+
+<h2>零样本（ZS）</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>模型</th><th>任务</th><th class="n">成功率</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>π₀.₅ base（论文）</td><td>12 任务宏平均</td><td class="n">2.78</td><td>Table 2</td></tr>
+    <tr><td>π₀.₅ base（我们）</td><td>PressButton</td><td class="n">0 / 30 ×2</td><td>两次独立跑</td></tr>
+    <tr><td>LingBot-VA</td><td>PressButton</td><td class="n">0 / 10</td><td>128×128 LIBERO 配置，单帧，流式 VAE</td></tr>
+    <tr><td>Cosmos-Policy-LIBERO-2B</td><td>PressButton</td><td class="n">0 / 20</td><td>delta 位姿按 robosuite OSC 量程换算；VAE 用公开 Wan2.1 权重替代 gated 基座</td></tr>
+  </tbody>
+</table>
+</div>
+<p>跨本体 + 跨物理引擎 + 动作空间不同，三家 VLA 零样本都不能迁移，这条线可以结题。</p>
+
+<h2>每一项改动分别值多少</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>改动</th><th>证据</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td>修 <code>--policy-target-hz</code>（stride 1 → 6）</td><td class="mono">PressButton 33.3 → 96.7</td><td><span class="pill ok">必须</span> 缺了它相当于 6 倍速执行</td></tr>
+    <tr><td>执行步数 NACT（同一 A 版模型）</td><td class="mono">PegInHole 4:0 · 8:30 · 12:53.3 · 16:73.3 · 24:46.7 · 32:50</td><td><span class="pill ok">取 16</span> 论文默认 8 系统性欠走</td></tr>
+    <tr><td>动作平滑 / 块重叠</td><td class="mono">PegInHole 73.3 → 56.7 / 20.0</td><td><span class="pill bad">有害</span> 已弃用</td></tr>
+    <tr><td>夹爪 oracle（PushSlider）</td><td class="mono">0 / 30</td><td><span class="pill bad">无效</span> 夹爪不是瓶颈</td></tr>
+    <tr><td>B 版加 3 个任务的数据</td><td class="mono">NDT 0 → 100 · RotateValve 26.7 → 86.7 · 但 PressButton 100 → 33.3 · PegInHole 73.3 → 30</td><td><span class="pill warn">零和</span> 全局分位数被重新洗牌</td></tr>
+    <tr><td>单任务归一化 ST（20k）</td><td class="mono">NDT 0 → 66.7 · RotateValve +40 · PegInHole −63</td><td><span class="pill warn">零和</span> PegInHole 的掉分是过拟合（5k/10k 有 47/50），不是归一化</td></tr>
+    <tr><td>去 NDT 重训全局（mt7_no_ndt）</td><td class="mono">RotateValve 26.7 → 56.7，四个高分任务保持，Lemon 70 / 86.7 两次复测 ≈ 持平</td><td><span class="pill ok">采用</span> 目前基线</td></tr>
+    <tr><td>ST 早停（10k，从 mt7 起步）</td><td class="mono">RotateValve 53.3/60.0 · NDT 26.7/26.7 · PegInHole 20.0/40.0，全部不如 mt7 本身</td><td><span class="pill bad">否决</span> mt7 没见过 NDT，10k 单任务只到 26.7；A 版起步的 20k 才有 66.7 —— ST 增益依赖 MT 阶段见过该任务</td></tr>
+    <tr><td>专家在环回放（评测链自检）</td><td class="mono">PushSlider 10/10（20 Hz 保持）· 10/10（120 Hz）· PressButton 10/10</td><td><span class="pill ok">链路无问题</span> 录制 → 20 Hz 目标 → stride → IK-PID 能拖动滑块；PushSlider 的 0 是学习/数据问题</td></tr>
+    <tr><td>DP（Diffusion Policy）PushSlider 单任务</td><td class="mono">30/30 = 100（单相机 80 集）</td><td><span class="pill ok">数据没问题</span> 论文 DP 63.3；π₀.₅ 单相机学不会是模型/表示问题，双相机后 π₀.₅ 也到 100</td></tr>
+    <tr><td>机载视角（双相机 ST，每任务 80 集）</td><td class="mono">PegInHole +33 · PushSlider +100 · PullLever +10 · Lemon +8 · Cabinet +13 · RotateValve −30 · NDT 0</td><td><span class="pill ok">采用</span> 目前最大的单一杠杆</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>还没解决的</h2>
+<div class="grid2">
+  <div class="box">
+    <h4>PushSlider · 已解决：0 → 100（论文 100）</h4>
+    <p>四个 π₀.₅ 版本 + ACT 在同一份数据上全部同一种失败：夹住滑块后向右拉的过程中，命令 z 抖动并抬升，夹爪向上滑脱；专家轨迹 z 恒为 0.0000。z 抖动幅度随归一化量程按比例缩小（0.36 → 0.12 mm/步）但成功率不变，抖动不是决定因素。</p>
+    <p><strong>专家在环回放 10/10</strong> 排除了接口问题；换成"腕部 + 机载双相机 + 注噪 40 集"的 ST 后 5k 步 100%。机载视角让模型看到自己和导轨的相对位置，是滑脱消失的最可能原因（注噪的单独贡献待拆分）。</p>
+  </div>
+  <div class="box">
+    <h4>FrameAssembly · 专家已修好：0/16 → 80/80</h4>
+    <p>根因是资产 bug：框架的中心短柱（专家抓的把手）只有视觉几何、<strong>没有碰撞体</strong>，两指穿过它并拢到 2 mm，框架只是挂在指尖上滑动。给短柱补上碰撞体后专家 80/80，双相机 80 集已录完，待训练。</p>
+  </div>
+  <div class="box">
+    <h4>WipeWindow · 专家已修好：0 → 80/164（48.8%）</h4>
+    <p>两层 bug：reset 把海绵写进全闭的 2 mm 指缝（FA-Hexa 缺宽度换算，去穿透把海绵弹到指尖下方挂着）；位置控制无法调力（压深 0.215 m → 35 N、0.225 m → 0.1 N）。修好夹持后把专家改成<strong>腕部力伺服</strong>（目标 4 N，进得慢退得快），试录 3/3、6 集批 4/6，80 集正式录制成功率 48.8%，失败集 72% 只擦掉 1 个污点（首次接触 17 N 冲击仍会顶偏海绵）。腕部六维力已作为可选观测进入录制（state 14 维）。</p>
+  </div>
+  <div class="box">
+    <h4>TossBall · 专家已修好：0/462 → 6/6</h4>
+    <p>三层 bug：球被写进闭合夹爪；默认工具点在指尖末端；机体跟随末端，球悬在前机臂正上方，专家原来的 36°/60° 低头把球压在机臂上；最后<strong>桶本身是实心的</strong>（Nucleus 载荷网格按凸包碰撞，球永远进不去）。改成运行时用 5 块薄板拼空心桶，专家重写为解析弹道（桶前 1.0 m、高 1.45 m、25°、跟踪比 0.87），80 集正式录制 <strong>80/80</strong>、零失败。注意 16 并行环境下该任务的录制器会卡死在第 600 步，6 并行正常。</p>
+  </div>
+  <div class="box">
+    <h4>CabinetPickPlace · 13.3（论文 0）</h4>
+    <p>专家 80/80 但三段式长程规划，80 集数据不够；双相机 ST 5k 只有 13.3。留到扎实版本加数据量。</p>
+  </div>
+</div>
+
+<h2>录制修复（扎实版本的起点）</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>任务</th><th class="n">修前专家</th><th class="n">修后专家</th><th>根因</th><th>数据</th></tr></thead>
+  <tbody>
+    <tr><td>FrameAssembly</td><td class="n">0 / 16</td><td class="n">80 / 80</td><td>把手短柱无碰撞体</td><td>80 集双相机 ✓</td></tr>
+    <tr><td>WipeWindow</td><td class="n">0 / 32</td><td class="n">80 / 164</td><td>海绵没被夹住 + 无力反馈 → 腕部力伺服</td><td>80 集双相机 + 腕部力 ✓</td></tr>
+    <tr><td>TossBall</td><td class="n">0 / 462</td><td class="n">80 / 80</td><td>夹持 reset、工具点、机臂遮挡、实心桶 → 弹道专家</td><td>80 集双相机 + 腕部力 ✓</td></tr>
+    <tr><td>PegInHole</td><td class="n">80 / 89</td><td class="n">6 / 6</td><td>同一 reset bug，修后行为改变，需重录才能与新 reset 一致</td><td>待重录</td></tr>
+    <tr><td>LemonHarvesting</td><td class="n">84 / 87</td><td class="n">3 / 3</td><td>同一只桶，空心后柠檬真正落入桶内</td><td>待重录</td></tr>
+    <tr><td>OpenDoor</td><td class="n">80 / 80</td><td class="n">—</td><td>门把手无碰撞体，但专家推门板不碰把手，仅保真度问题</td><td>不变</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="small">全局改动：FA-Hexa 手指驱动刚度 100 → 1000；框架 0.3 kg、球 0.05 kg；新增可选观测 <code>ee_wrench</code>（ee_link 固定关节反作用力，机体系 6 维；录制 <code>WRENCH=1</code>，导出 <code>--include_wrench</code>，训练可选择关闭做对照）。这些改动使已有 12 任务数据与新环境不完全一致，扎实版本需统一重录。</p>
+
+<h2>正在跑的</h2>
+<ul>
+  <li>TossBall 80 集双相机 + 腕部力录制（弹道专家）</li>
+  <li>OpenDM（DM0.5）9 任务双相机 LoRA 10k 步：4 个任务评测已完成（见"换基座"一节）；Being-H0.5 训练已暂停，GPU 让给录制</li>
+  <li>DP PushSlider（单相机，80 集）：<strong>30/30 = 100%</strong>，论文 DP 63.3</li>
+</ul>
+<p class="small">评测设定统一：FA-Hexa · EE target + IK-PID · 20 Hz · chunk 50 执行 16 · 扰动全关（与论文一致）· 每格 30 rollouts。</p>
+</main>
+
+<script>
+(function(){
+  const cls=v=>v>=96?'h5':v>=76?'h4':v>=51?'h3':v>=26?'h2':v>=1?'h1':'';
+  const rows=document.querySelectorAll('#big tbody tr:not(.grp):not(.avg)');
+  rows.forEach(tr=>{
+    const cells=[...tr.querySelectorAll('td.n')];
+    cells.forEach(td=>{
+      const nums=(td.textContent.match(/\d+(?:\.\d+)?/g)||[]).map(Number); if(!nums.length||td.classList.contains('na')) return; const v=Math.max(...nums);
+      const c=cls(v); if(c) td.classList.add(c);
+    });
+    // 我们的列：索引 4..8（A,B,ST,mt7,组合）
+    const ours=cells.slice(4,9).map(td=>({td,v:Math.max(...((td.textContent.match(/\d+(?:\.\d+)?/g)||[]).map(Number)),-1)})).filter(o=>o.v>=0&&!o.td.classList.contains('na'));
+    const mx=Math.max(...ours.map(o=>o.v));
+    if(mx>0) ours.filter(o=>o.v===mx).forEach(o=>o.td.classList.add('best'));
+  });
+  document.querySelectorAll('#big tbody tr.avg td.n').forEach(td=>{const v=parseFloat(td.textContent);const c=cls(v);if(c)td.classList.add(c);});
+})();
+</script>

@@ -1,0 +1,282 @@
+<title>具身失败闭环研究规划</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;800&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#f4f6f8; --paper:#ffffff; --ink:#1b2230; --ink-2:#4a5466; --line:#d9dee6; --line-2:#e9edf2;
+  --accent:#2c5b86; --accent-soft:#e3ecf5; --warn:#9a5b12; --warn-soft:#fbf0e1; --ok:#2f6b4a; --ok-soft:#e4f1e9;
+  --code:#eef1f5;
+  --serif:"Noto Serif SC","Songti SC","STSong",serif;
+  --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#12161d; --paper:#181d26; --ink:#e4e8ef; --ink-2:#a6afbe; --line:#2c3441; --line-2:#232a35;
+    --accent:#8db7df; --accent-soft:#1d2a3a; --warn:#e2ac66; --warn-soft:#2c2316; --ok:#86c7a1; --ok-soft:#18281f; --code:#1f2530;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#12161d; --paper:#181d26; --ink:#e4e8ef; --ink-2:#a6afbe; --line:#2c3441; --line-2:#232a35;
+  --accent:#8db7df; --accent-soft:#1d2a3a; --warn:#e2ac66; --warn-soft:#2c2316; --ok:#86c7a1; --ok-soft:#18281f; --code:#1f2530;
+}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.75;padding-inline:16px;padding-block:32px 64px}
+main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+header.doc{border-bottom:2px solid var(--ink);padding-bottom:20px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+h1{font-family:var(--serif);font-weight:800;font-size:clamp(26px,4.2vw,36px);line-height:1.3;margin:0;text-wrap:balance}
+.lede{font-size:16.5px;color:var(--ink-2);margin:0;max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--ink-2)}
+.meta b{color:var(--ink);font-weight:500}
+section{display:flex;flex-direction:column;gap:14px}
+h2{font-family:var(--serif);font-weight:600;font-size:22px;line-height:1.4;margin:0;display:flex;gap:12px;align-items:baseline;text-wrap:balance}
+h2 .n{font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:600;min-width:2ch}
+h3{font-size:16px;font-weight:700;margin:6px 0 0}
+p{margin:0;max-width:74ch}
+ul,ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;max-width:74ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--code);padding:1px 5px;border-radius:3px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.55}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+th{font-weight:700;background:var(--line-2);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr.ours td{background:var(--accent-soft)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap}
+.y{color:var(--ok);font-weight:700}.p{color:var(--warn);font-weight:700}.x{color:var(--ink-2)}
+.pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;white-space:nowrap}
+.pill.main{background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.thesis{background:var(--paper);border:1px solid var(--accent);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.thesis .row{display:grid;grid-template-columns:7em 1fr;gap:4px 14px}
+.thesis .k{font-weight:700;color:var(--accent)}
+@media (max-width:520px){.thesis .row{grid-template-columns:1fr}}
+.claims{display:grid;gap:14px}
+.claim{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.claim.core{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.claim .tag{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.claim h3{margin:0;font-size:17px}
+.note{background:var(--warn-soft);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 6px 6px 0;display:flex;flex-direction:column;gap:6px}
+.note b{color:var(--warn)}
+.decide{background:var(--paper);border:1px dashed var(--accent);border-radius:6px;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+pre.mermaid{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px;margin:0;overflow-x:auto;text-align:center}
+.small{font-size:13px;color:var(--ink-2)}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.refs{columns:2 300px;gap:28px;font-size:13px;list-style:none;padding:0;display:block}
+.refs li{break-inside:avoid;margin-bottom:6px}
+</style>
+
+<main>
+<header class="doc">
+  <div class="eyebrow">研究规划 · 草案 v2 · 2026-09-25</div>
+  <h1>让 Agent 做具身模型的研发工程师：从执行记录推断能力缺口，改数据、环境与架构</h1>
+  <p class="lede">Agent 读具身模型执行后留下的完整记录（视频与数值），推断模型欠缺哪些能力、或环境本身有什么缺陷，然后修改模型的研发管线：训练数据生产、仿真训练环境、观测与架构、训练配方。每一轮迭代产出的是一个更好的研发配置，模型参数更新只是这个配置执行后的结果。</p>
+  <div class="meta"><span>基座 <b>π₀.₅（openpi）</b>，DM0.5 作第二基座</span><span>主基准 <b>RoboTwin 2.0 hard</b></span><span>辅基准 <b>LIBERO-PRO / Plus</b>、<b>AM-Bench</b></span><span>最近工作 <b>RoboCoach（Level 2）</b></span></div>
+</header>
+
+<section id="thesis">
+  <h2><span class="n">1</span>定位</h2>
+  <div class="thesis">
+    <div class="row"><span class="k">Agent 的角色</span><span>具身模型的研发工程师，不是模型的一部分。不把视频喂给具身模型让它自我改进，也不通过 in-context learning 或 RL 直接更新参数。</span></div>
+    <div class="row"><span class="k">输入</span><span>执行记录：多视角 rollout 视频、状态量、动作、力、成功判据与子判据、训练曲线。</span></div>
+    <div class="row"><span class="k">推断</span><span>模型欠缺什么能力，或者失败根本不是模型的问题而是环境缺陷。</span></div>
+    <div class="row"><span class="k">改动对象</span><span>研发管线的四层：训练数据生产管线、仿真训练环境与资产、观测模态与模型架构、训练配方。</span></div>
+    <div class="row"><span class="k">产出</span><span>每轮一个研发配置，经留出协议评测后决定保留、回滚或分支。</span></div>
+  </div>
+  <p>RoboCoach（arXiv 2601.21570）提出了一张自动化具身开发路线图：Level 1 自动化单个组件，Level 2 在固定任务和评测下自主开发单个策略，Level 3 开发跨任务、跨本体的具身基础模型。RoboCoach 自称做到 Level 2，且只改训练代码。我们的目标是往 Level 3 走：研发对象是多任务 VLA，编辑范围下沉到数据生产和训练环境。</p>
+</section>
+
+<section id="motivation">
+  <h2><span class="n">2</span>动机：我们已经手工跑通过一次这个闭环</h2>
+  <p>在 AM-Bench（空中操作，12 任务）上，我们用一周时间反复执行"看评测失败视频与数值记录 → 判断是环境问题还是能力缺口 → 修改研发管线 → 重录 → 训练评测"。π₀.₅ 固定配方 12 任务宏平均 56.7，组合最优 65.3，超过论文 ST-FT 的 52.22；三个专家成功率为 0 的任务全部修到可用。每一步改的都是研发管线，没有一步是让模型自己看视频。</p>
+  <div class="tw"><table>
+    <thead><tr><th>任务</th><th>失败现象</th><th>判断</th><th>改动的研发管线层</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>FrameAssembly</td><td>夹爪一直闭合，框架却下滑</td><td>环境缺陷：把手短柱无碰撞体</td><td>仿真环境与资产</td><td class="num">专家 0/16 → 80/80</td></tr>
+      <tr><td>TossBall</td><td>一开始运动球就掉</td><td>环境缺陷：夹持 reset 缺宽度换算、实心桶；专家缺陷：低头把球压在机臂上</td><td>仿真环境、数据生产（弹道专家）</td><td class="num">专家 0/462 → 80/80</td></tr>
+      <tr><td>WipeWindow</td><td>擦两三下海绵就掉</td><td>环境缺陷加能力缺口：海绵未夹住；位置控制调不出接触力</td><td>仿真环境、数据生产（力伺服专家）、观测（腕部六维力）</td><td class="num">专家 0/32 → 80/164</td></tr>
+      <tr><td>PushSlider</td><td>π₀.₅ 夹住后 z 向上滑脱</td><td>能力缺口：看不到与导轨的相对位置，偏离后不会纠正</td><td>观测与架构（机载相机）、数据生产（注噪纠正演示）</td><td class="num">模型 0 → 100</td></tr>
+      <tr><td>RotateValve</td><td>加机载相机后超时增多</td><td>同一干预对不同任务作用相反</td><td>观测与架构</td><td class="num">模型 56.7 → 26.7</td></tr>
+    </tbody>
+  </table></div>
+  <p>两条经验：<b>不看视频无法理解失败</b>，TossBall 只凭日志先后怀疑刚度、摩擦、求解器、质量，全部无效，看帧才发现球被压在机臂上；<b>光看视频也不够</b>，夹爪开度 0.002、球进桶瞬间被 reset、桶是实心的，都靠状态量、逐步轨迹和对照实验才确认。</p>
+</section>
+
+<section id="related">
+  <h2><span class="n">3</span>相关工作与空白</h2>
+  <p>按"Agent 能改研发管线的哪几层"来对比最近的工作。✓ 表示由诊断驱动的闭环覆盖，△ 表示有技术积累但不受诊断驱动，— 表示未涉及。</p>
+  <div class="tw"><table>
+    <thead><tr><th>工作</th><th>训练代码与超参</th><th>数据生产</th><th>仿真环境与资产</th><th>观测与架构</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td>RoboCoach（2601.21570，2026-01）</td><td class="c y">✓</td><td class="c x">—</td><td class="c x">—</td><td class="c p">△ 网络结构</td><td>Level 2；32 任务均值 0.73 对人类 0.60；视频通道消融贡献约 0.05</td></tr>
+      <tr><td>ENPIRE（2606.19980，2026-06）</td><td class="c y">✓</td><td class="c x">—</td><td class="c p">△ 真机复位校验</td><td class="c x">—</td><td>真机版的同类闭环</td></tr>
+      <tr><td>EvoMaster（2604.17406，2026-04）</td><td class="c y">✓</td><td class="c x">—</td><td class="c x">—</td><td class="c x">—</td><td>RoboCoach 同组，推广到通用科研循环</td></tr>
+      <tr><td>EmboMatrix（2510.12072，2025-10）</td><td class="c x">—</td><td class="c p">△</td><td class="c p">△</td><td class="c x">—</td><td>RoboCoach 同组的数据与仿真引擎，未接诊断闭环</td></tr>
+      <tr><td>FATE / Scene2Demo / SimWorld Studio（2026）</td><td class="c x">—</td><td class="c p">△</td><td class="c p">△ 任务层</td><td class="c x">—</td><td>失败触发的任务或动作流程修改，未下沉到资产与物理</td></tr>
+      <tr><td>RISE / GigaBrain / SimpleVLA-RL / π*0.6</td><td class="c x">—</td><td class="c p">△ 自采 rollout</td><td class="c x">—</td><td class="c x">—</td><td>固定管线下更新参数，作为对照组</td></tr>
+      <tr class="ours"><td><b>本研究</b></td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>诊断驱动，覆盖四层，区分环境缺陷与能力缺口</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><b>失败理解</b>一类（KITE、ProTracer、FailBench、LabRobFail、Robot Critics、Fail-RAG 等）在 2026 年已很拥挤，定位为我们的组件或对照，不作为独立卖点。空白在于：没有工作利用仿真特权信息（碰撞体、接触力、真值状态）辅助 VLM 诊断，也没有工作区分"策略失败"与"仿真缺陷造成的伪失败"。</li>
+    <li><b>开环任务与数据生成</b>一类（RoboGen、GenSim、RoboTwin 2.0、RoboCasa）按多样性驱动，反馈信号是专家代码能否执行，不是训练出的模型缺什么。</li>
+    <li><b>仿真基准缺陷的审计与修复</b>在 2026 年公开文献中未检索到专门工作；相邻的 RoboTwin-Phys（2609.26292）系统改变物理属性测鲁棒性，不修基准本身。</li>
+  </ul>
+  <div class="note">
+    <p><b>需要正面回应的两点。</b>其一，RoboCoach 的消融中视频通道贡献最小（约 0.05），排在文本信号和分支搜索之后，这与"视频是主证据"的主张相冲突。我们的解释是证据需求取决于编辑层：改代码时报错和曲线足以发现问题，改环境和数据时根因只在视频里可见。这需要一个"证据通道 × 编辑层"的交叉实验来证明。其二，FailBench 发现微调过的失败检测模型不如通用 VLM，因此诊断主方案采用通用 VLM 加探针实验，微调专用模型只作为可选项。</p>
+    <p><b>竞争风险：</b>RoboCoach 团队已有 EmboMatrix 数据与仿真引擎，把两者接起来很可能是他们的下一步。观测模态这一层在检索到的所有工作中完全空白，且我们有现成案例，应作为最先落地的差异点。</p>
+  </div>
+</section>
+
+<section id="claims">
+  <h2><span class="n">4</span>核心创新点</h2>
+  <div class="claims">
+    <article class="claim core">
+      <div class="tag">创新点一 · 核心</div>
+      <h3>从执行记录推断能力缺口，并区分环境缺陷与能力缺口</h3>
+      <ul>
+        <li><b>输入是视觉加数值的完整执行记录</b>，输出两类结论：环境或数据本身有缺陷（伪失败），或者模型欠缺某种能力（真失败）。这个区分决定后续改哪一层。</li>
+        <li><b>仿真特权视角</b>：Agent 可主动请求碰撞体网格、接触点与接触力、质心轨迹、慢放和局部放大等真实世界没有的渲染。把手无碰撞体、实心桶在碰撞体视图里一帧可见。</li>
+        <li><b>主动探针实验</b>：看完记录提出假设，设计最小对照实验去证伪，例如"静止保持不丢球、仅俯仰就丢球"。以实验结论代替 VLM 的一次性判断。</li>
+      </ul>
+    </article>
+    <article class="claim">
+      <div class="tag">创新点二 · 方法</div>
+      <h3>诊断驱动的研发管线编辑：下沉到数据生产、训练环境与观测</h3>
+      <ul>
+        <li><b>编辑空间四层</b>：训练数据生产管线（专家、录制、注噪、初始条件分布）、仿真训练环境与资产（碰撞体、物理参数、reset、判据以外的任务定义）、观测模态与模型架构（相机视角、力觉、输入编码）、训练配方。</li>
+        <li><b>修复</b>针对环境缺陷，修法基本确定，用"修改后专家能否成功"验证。<b>增强</b>针对能力缺口，VLM 无法事先知道正确答案，做成"诊断缺口类型 → 从干预库提候选 → 小预算验证 → 保留有效者"的搜索。</li>
+        <li><b>经验库</b>：记录"缺口类型、干预、效果"，跨任务复用。借鉴 RoboCoach 的树形记忆、每轮独立工作区、快速调试再提交完整作业。</li>
+      </ul>
+    </article>
+    <article class="claim">
+      <div class="tag">创新点三 · 评测</div>
+      <h3>防泄露评测协议与"环境缺陷还是能力缺口"诊断基准</h3>
+      <ul>
+        <li><b>协议</b>：Agent 只看开发集记录；留出任务与留出扰动类型检验泛化；冻结环境版本，"基准修复"与"训练增强"分两本账。</li>
+        <li><b>诊断基准</b>：向仿真注入已知缺陷（去碰撞体、错工具点、实心容器、限速、错误 reset、错误摩擦），并混入同一任务上真实的模型能力失败，生成带"环境缺陷 / 能力缺口 / 具体根因"标签的执行记录；再加入 AM-Bench 上真实发现的缺陷作为真实分布测试集。已有注入真值的工作（When Should a Failing Robot Ask?、TrapVLA）用途不同，都不区分这两类。</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<section id="loop">
+  <h2><span class="n">5</span>闭环框架概要</h2>
+  <p class="small">具体方案暂不深入，下图只界定模块边界和信息流。</p>
+  <pre class="mermaid">
+flowchart LR
+  A[具身模型在开发集上执行] --> B[执行记录：视频 + 状态 + 力 + 判据 + 训练曲线]
+  B --> C{Agent 诊断}
+  C -->|请求特权视角| B
+  C -->|提出假设| D[探针实验]
+  D -->|证实或证伪| C
+  C -->|环境缺陷| E[修复：资产 / reset / 专家]
+  C -->|能力缺口| F[增强候选：数据生产 / 观测与架构 / 训练配方]
+  F --> G[小预算验证]
+  G -->|保留有效干预| H[数据生产管线]
+  E --> H
+  H --> I[训练]
+  I --> A
+  I --> J[(留出评测：冻结环境版本)]
+  </pre>
+</section>
+
+<section id="setup">
+  <h2><span class="n">6</span>数据、基准与基础模型</h2>
+  <div class="tw"><table>
+    <thead><tr><th>角色</th><th>基准</th><th>现状</th><th>选择理由</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill main">主基准</span></td><td>RoboTwin 2.0（hard，域随机化）</td><td class="num">π₀ clean 21.0%，DR 微调 29.8%；π₀.₅ 无官方数字</td><td>未饱和；自带可编程专家和数据生成管线；可改资产；RoboCoach 也用了它，便于直接对照</td></tr>
+      <tr><td><span class="pill ok">快速验证</span></td><td>LIBERO-PRO / LIBERO-Plus</td><td class="num">原版 π₀.₅ ≈96.5%；位置扰动后 0.08–0.38</td><td>单卡评测，openpi 脚手架最全；失败按扰动轴划分，适合先把闭环跑通</td></tr>
+      <tr><td><span class="pill ok">跨本体</span></td><td>AM-Bench（空中操作）</td><td class="num">我们 56.7 / 65.3，论文 52.22</td><td>已有完整人工闭环记录与真实缺陷，可作为 Agent 诊断的真值</td></tr>
+      <tr><td><span class="pill warn">后期可选</span></td><td>BEHAVIOR-1K</td><td class="num">2025 挑战赛冠军约 12.4%</td><td>最难、基于 π₀.₅，但一轮约千 GPU 时，只做一次终验</td></tr>
+      <tr><td><span class="pill warn">备选</span></td><td>ManiSkill3 / GemBench</td><td class="num">π₀.₅ MultiTask 40.1%；GemBench L4 0.3%</td><td>ManiSkill3 基础设施最灵活；GemBench 泛化轴分解最清晰</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><b>被研发的模型</b>：π₀.₅（openpi）多任务 VLA 为主；DM0.5 作为第二基座，验证方法与基座无关。</li>
+    <li><b>Agent</b>：前沿闭源模型为主力，开源 VLM（如 Qwen-VL 系列）作对照；诊断用通用 VLM 加探针，不依赖微调。</li>
+    <li><b>数据</b>：各基准官方演示为起点；Agent 生产的修复数据和增强数据分别记账。</li>
+  </ul>
+</section>
+
+<section id="protocol">
+  <h2><span class="n">7</span>评测协议：防止泄露</h2>
+  <div class="tw"><table>
+    <thead><tr><th>泄露类型</th><th>表现</th><th>对策</th></tr></thead>
+    <tbody>
+      <tr><td>测试条件泄露</td><td>针对测试集失败的初始位置专门造数据</td><td>Agent 只观察开发集记录（不同种子、物体实例）；最终在从未见过的种子上评测</td></tr>
+      <tr><td>任务级过拟合</td><td>在某任务反复迭代，提升只对该任务有效</td><td>留出任务：Agent 只在部分任务上迭代，测未碰过的任务；LIBERO-Plus 按扰动类型留出</td></tr>
+      <tr><td>修环境等于改考卷</td><td>修复碰撞体、空心桶后测试环境本身变简单</td><td>冻结修复后的环境版本，所有对照组在同一版本上训练评测；"基准修复"不计入方法提升</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><b>完整性约束</b>：Agent 不得修改成功判据和评测集；所有编辑按"修复"或"改变难度"分类并留痕，改变难度的编辑需人工确认。</li>
+    <li><b>泛化假设</b>：实例级增强（在失败位置多录）只在原分布有效；能力级增强（新观测、纠正演示）可迁移。已有佐证：双相机加注噪使 PushSlider 0 → 100，同时 PegInHole +33。</li>
+  </ul>
+</section>
+
+<section id="experiments">
+  <h2><span class="n">8</span>需要达成的实验效果</h2>
+  <div class="tw"><table>
+    <thead><tr><th>实验</th><th>设置</th><th>目标</th></tr></thead>
+    <tbody>
+      <tr><td>主结果</td><td>RoboTwin hard、LIBERO-PRO，相同 GPU 预算。对照：固定官方数据；同任务加量录制；开环生成；固定管线下的参数更新（RL 自改进）；只改训练代码的 Agent（RoboCoach 式，或 Claude Code / Codex）；人工研发上界</td><td>显著超过"只改训练代码"和"只更新参数"两组；RoboTwin hard 宏平均 +15～20 点；LIBERO-PRO 从 0.3 左右回到 0.7 以上；给出迭代轮数–成功率曲线</td></tr>
+      <tr><td>编辑层消融</td><td>四层逐层开启：代码 → +数据生产 → +环境与资产 → +观测与架构</td><td>每加一层都有增量；证明下沉到数据和环境是提升来源</td></tr>
+      <tr><td>证据通道 × 编辑层</td><td>证据：仅日志与指标 / +默认视频 / +特权视角 / +探针；编辑层：仅代码 vs 全部四层</td><td>在仅代码层复现 RoboCoach"视频贡献小"的结论；在环境与数据层视频与特权视角贡献显著更大</td></tr>
+      <tr><td>诊断基准</td><td>注入缺陷与真实能力失败混合；四档证据输入</td><td>"环境缺陷 / 能力缺口"二分准确率与根因定位准确率逐档上升，探针档显著超过 FailBench 报告的 0.6–0.77</td></tr>
+      <tr><td>跨本体</td><td>AM-Bench 12 任务，从未修复版本起步</td><td>Agent 自主让至少一个 0% 任务可用；宏平均超过人工研发的 65.3</td></tr>
+      <tr><td>泛化</td><td>留出任务、留出扰动类型；与同数据量非针对性加数据对比</td><td>留出任务上有正向提升且无显著退化；能力级增强的迁移收益大于实例级</td></tr>
+      <tr><td>成本</td><td>每轮 GPU 时、API 费用、每个缺陷的探针次数</td><td>与人工研发的时间和算力对比</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">每格至少 100 次 rollout 或多种子。AM-Bench 上每格 30 次时误差约 ±9 个点，不足以支撑主结论。</p>
+</section>
+
+<section id="risks">
+  <h2><span class="n">9</span>风险与待定事项</h2>
+  <ul>
+    <li><b>RoboCoach 团队的下一步</b>：他们已有 EmboMatrix 数据与仿真引擎，接入诊断闭环会直接进入我们的空白区。观测模态和"环境缺陷 / 能力缺口"区分应最先落地。</li>
+    <li><b>视频贡献的反例</b>：必须用"证据通道 × 编辑层"实验正面回应，否则核心主张站不住。</li>
+    <li><b>RoboCoach 尚未开源</b>：若论文期间仍未公开，用 Claude Code / Codex 在同一基座模型下实现"只改训练代码"的对照。</li>
+    <li><b>算力</b>：每轮包含录制、训练、评测，需用小预算代理实验筛选干预。</li>
+    <li><b>π₀.₅ 基线缺失</b>：RoboTwin 2.0 无官方 π₀.₅ 数字，立项第一周自行补测。</li>
+  </ul>
+  <div class="decide">
+    <p><b>待决定</b></p>
+    <ol>
+      <li>论文主线：以"下沉到数据与环境的研发 Agent"为核心的方法论文，还是加上诊断基准的双贡献论文。</li>
+      <li>主基准：RoboTwin 2.0（与 RoboCoach 可直接对照）还是 LIBERO-PRO（迭代更快）。</li>
+      <li>目标会议与时间线。</li>
+    </ol>
+  </div>
+</section>
+
+<section id="refs">
+  <h2><span class="n">10</span>主要参考</h2>
+  <ul class="refs">
+    <li><a href="https://arxiv.org/abs/2601.21570">RoboCoach / EmboCoach-Bench</a>（2601.21570）</li>
+    <li><a href="https://arxiv.org/abs/2606.19980">ENPIRE</a>（2606.19980）</li>
+    <li><a href="https://arxiv.org/abs/2604.17406">EvoMaster</a>（2604.17406）</li>
+    <li><a href="https://arxiv.org/abs/2510.12072">EmboMatrix</a>（2510.12072）</li>
+    <li><a href="https://arxiv.org/abs/2603.01505">FATE</a>（2603.01505）</li>
+    <li><a href="https://arxiv.org/abs/2602.12065">Scene2Demo</a>（2602.12065）</li>
+    <li><a href="https://arxiv.org/abs/2605.09423">SimWorld Studio</a>（2605.09423）</li>
+    <li><a href="https://arxiv.org/abs/2602.11075">RISE</a>（2602.11075）</li>
+    <li><a href="https://arxiv.org/abs/2604.07034">KITE</a>（2604.07034）</li>
+    <li><a href="https://arxiv.org/abs/2609.21369">ProTracer</a>（2609.21369）</li>
+    <li><a href="https://arxiv.org/abs/2609.03611">FailBench</a>（2609.03611）</li>
+    <li><a href="https://arxiv.org/abs/2609.21942">When Should a Failing Robot Ask?</a>（2609.21942）</li>
+    <li><a href="https://arxiv.org/abs/2608.26578">TrapVLA</a>（2608.26578）</li>
+    <li><a href="https://arxiv.org/abs/2609.26292">RoboTwin-Phys</a>（2609.26292）</li>
+    <li><a href="https://arxiv.org/abs/2506.18088">RoboTwin 2.0</a>（2506.18088）</li>
+    <li><a href="https://arxiv.org/abs/2609.00641">AM-Bench</a>（2609.00641）</li>
+  </ul>
+  <p class="small">详细材料见项目目录：<code>调研_2026以来AI4AI与具身自迭代.md</code>、<code>调研_AI4AI与RSI具身.md</code>、<code>调研_地面操作仿真基准.md</code>、<code>文献/EmboCoach-Bench/精读笔记.md</code>、<code>文献/EmboCoach-Bench/后续相关研究.md</code>。标注"待核实"的条目立项前需人工复核。</p>
+</section>
+</main>

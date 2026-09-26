@@ -1,0 +1,69 @@
+kimi-k3-official | video | P3_checklist | frame_fail/demo_0000 | rep1  ok  285.2s
+kimi-k3-official | video | P3_checklist | frame_fail/demo_0000 | rep0  ok  365.0s
+kimi-k3-official | video | P3_checklist | frame_fail/demo_0001 | rep1  ok  395.4s
+kimi-k3-official | frames | P3_checklist | frame_fail/demo_0000 | rep1  ok  442.9s
+kimi-k3-official | video | P3_checklist | frame_fail/demo_0001 | rep0  ok  459.1s
+kimi-k3-official | frames | P3_checklist | frame_fail/demo_0000 | rep0  ok  480.8s
+kimi-k3-official | frames | P3_checklist | frame_fail/demo_0001 | rep0  ok  284.4s
+kimi-k3-official | video | P3_checklist | toss_fail/demo_0000 | rep1  ok  192.7s
+kimi-k3-official | video | P3_checklist | toss_fail/demo_0000 | rep0  ok  366.0s
+kimi-k3-official | frames | P3_checklist | frame_fail/demo_0001 | rep1  ok  515.8s
+kimi-k3-official | frames | P3_checklist | toss_fail/demo_0000 | rep0  ok  443.5s
+kimi-k3-official | frames | P3_checklist | toss_fail/demo_0000 | rep1  ok  453.2s
+kimi-k3-official | video | P3_checklist | toss_fail/demo_0001 | rep1  ok  329.3s
+kimi-k3-official | frames | P3_checklist | wipe_fail/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  7.8s
+kimi-k3-official | frames | P3_checklist | wipe_fail/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  5.1s
+kimi-k3-official | video | P3_checklist | wipe_fail/demo_0002 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  4.2s
+kimi-k3-official | video | P3_checklist | wipe_fail/demo_0002 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  1.7s
+kimi-k3-official | frames | P3_checklist | wipe_fail/demo_0002 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  5.0s
+kimi-k3-official | frames | P3_checklist | wipe_fail/demo_0002 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  5.1s
+kimi-k3-official | video | P3_checklist | frame_ok/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2<ak-f5zmf6yadm  6.8s
+kimi-k3-official | video | P3_checklist | frame_ok/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  2.4s
+kimi-k3-official | frames | P3_checklist | frame_ok/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  8.5s
+kimi-k3-official | frames | P3_checklist | frame_ok/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  7.6s
+kimi-k3-official | video | P3_checklist | frame_ok/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  7.1s
+kimi-k3-official | frames | P3_checklist | toss_fail/demo_0001 | rep0  ok  264.7s
+kimi-k3-official | video | P3_checklist | frame_ok/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  1.8s
+kimi-k3-official | frames | P3_checklist | frame_ok/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  11.1s
+kimi-k3-official | video | P3_checklist | toss_ok/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  3.2s
+kimi-k3-official | frames | P3_checklist | frame_ok/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  13.8s
+kimi-k3-official | video | P3_checklist | toss_ok/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  2.3s
+kimi-k3-official | frames | P3_checklist | toss_ok/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  6.6s
+kimi-k3-official | frames | P3_checklist | toss_ok/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  5.6s
+kimi-k3-official | video | P3_checklist | toss_ok/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2<ak-f5zmf6yadm  3.1s
+kimi-k3-official | video | P3_checklist | toss_ok/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  3.0s
+kimi-k3-official | frames | P3_checklist | toss_ok/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2<ak-f5zmf6yadm  5.7s
+kimi-k3-official | frames | P3_checklist | toss_ok/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2<ak-f5zmf6yadm  5.8s
+kimi-k3-official | video | P3_checklist | wipe_ok/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  3.9s
+kimi-k3-official | video | P3_checklist | wipe_ok/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  4.0s
+kimi-k3-official | frames | P3_checklist | wipe_ok/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  5.5s
+kimi-k3-official | frames | P3_checklist | wipe_ok/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Organization Rate limit exceeded, please try again after 1 seco  5.7s
+kimi-k3-official | video | P3_checklist | wipe_ok/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  4.2s
+kimi-k3-official | video | P3_checklist | wipe_ok/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  4.4s
+kimi-k3-official | frames | P3_checklist | wipe_ok/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  5.0s
+kimi-k3-official | frames | P3_checklist | wipe_ok/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  4.9s
+kimi-k3-official | video | P3_checklist | toss_fail/demo_0001 | rep0  ok  510.4s
+kimi-k3-official | video | P3_checklist | push_policy/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  5.3s
+kimi-k3-official | video | P3_checklist | push_policy/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  5.6s
+kimi-k3-official | video | P3_checklist | push_policy/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  5.2s
+kimi-k3-official | frames | P3_checklist | push_policy/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  7.1s
+kimi-k3-official | video | P3_checklist | push_policy/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  1.8s
+kimi-k3-official | frames | P3_checklist | push_policy/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  8.8s
+kimi-k3-official | video | P3_checklist | peg_policy/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.3s
+kimi-k3-official | frames | P3_checklist | push_policy/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  7.2s
+kimi-k3-official | video | P3_checklist | peg_policy/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.5s
+kimi-k3-official | frames | P3_checklist | push_policy/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  7.2s
+kimi-k3-official | video | P3_checklist | peg_policy/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.2s
+kimi-k3-official | video | P3_checklist | peg_policy/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.2s
+kimi-k3-official | frames | P3_checklist | peg_policy/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your credit balance is running low for account <org-ef8bad6bf17  6.6s
+kimi-k3-official | frames | P3_checklist | peg_policy/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  7.1s
+kimi-k3-official | video | P3_checklist | pull_policy/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.4s
+kimi-k3-official | video | P3_checklist | pull_policy/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.4s
+kimi-k3-official | frames | P3_checklist | peg_policy/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  7.2s
+kimi-k3-official | frames | P3_checklist | peg_policy/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  7.1s
+kimi-k3-official | video | P3_checklist | pull_policy/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.4s
+kimi-k3-official | video | P3_checklist | pull_policy/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'type': 'exceeded_current_quota_error', 'message': 'Quota suspended or budg  2.2s
+kimi-k3-official | frames | P3_checklist | pull_policy/demo_0000 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  6.2s
+kimi-k3-official | frames | P3_checklist | pull_policy/demo_0000 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  7.2s
+kimi-k3-official | frames | P3_checklist | pull_policy/demo_0001 | rep0  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  6.7s
+kimi-k3-official | frames | P3_checklist | pull_policy/demo_0001 | rep1  ERR RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-ef8bad6bf17e4524b9b4a3f418dd00e2 <ak-f5zmf6yad  6.5s
